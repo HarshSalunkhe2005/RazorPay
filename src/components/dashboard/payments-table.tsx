@@ -19,8 +19,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { FailedPayment, AgentOutcome, PaymentStatus, isPrecheckStop } from "@/lib/types";
+import { FailedPayment, AgentOutcome, PaymentStatus, AuditLogRecord, isPrecheckStop } from "@/lib/types";
 import { formatINR, formatDate, failureReasonLabel, initials } from "@/lib/format";
+import { buildAuditLogRecord } from "@/lib/audit-log";
 import { StatusBadge } from "./status-badge";
 import { AgentTraceDialog } from "./agent-trace-dialog";
 import { cn } from "@/lib/utils";
@@ -28,6 +29,7 @@ import { cn } from "@/lib/utils";
 interface PaymentsTableProps {
   payments: FailedPayment[];
   onStatusChange: (paymentId: string, status: FailedPayment["status"]) => void;
+  onAuditLogAppend: (records: AuditLogRecord[]) => void;
 }
 
 const RESOLVED_STATUSES: PaymentStatus[] = ["recovered", "lost", "escalated", "write_off"];
@@ -42,7 +44,7 @@ const STATUS_FILTERS: { value: PaymentStatus | "all"; label: string }[] = [
   { value: "lost", label: "Lost" },
 ];
 
-export function PaymentsTable({ payments, onStatusChange }: PaymentsTableProps) {
+export function PaymentsTable({ payments, onStatusChange, onAuditLogAppend }: PaymentsTableProps) {
   const [activePayment, setActivePayment] = useState<FailedPayment | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [outcomes, setOutcomes] = useState<Record<string, AgentOutcome>>({});
@@ -78,6 +80,19 @@ export function PaymentsTable({ payments, onStatusChange }: PaymentsTableProps) 
         ? "write_off"
         : "contacted";
     onStatusChange(paymentId, nextStatus);
+
+    const payment = payments.find((p) => p.id === paymentId);
+    if (payment) {
+      onAuditLogAppend([
+        buildAuditLogRecord({
+          paymentId: payment.id,
+          customerName: payment.customerName,
+          amount: payment.amount,
+          outcome,
+          source: "single",
+        }),
+      ]);
+    }
   }
 
   return (

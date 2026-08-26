@@ -97,29 +97,41 @@ const ESCALATION_BANNER: Record<
   },
 };
 
+/** Collapsed by default - the full trail is always saved to the centralized Audit Log
+ * tab (see audit-log-view.tsx), so this is just a quick peek, not the record of truth. */
 function AuditLog({ trail }: { trail: AuditEntry[] }) {
+  const [expanded, setExpanded] = useState(false);
+
   return (
     <div className="space-y-2">
-      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-        Audit trail
+      <button
+        onClick={() => setExpanded((e) => !e)}
+        className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground hover:text-foreground"
+      >
+        Audit trail ({trail.length}) <span className="text-muted-foreground/50">{expanded ? "−" : "+"}</span>
+      </button>
+      {expanded && (
+        <ol className="space-y-2 border-l border-border/60 pl-4">
+          {trail.map((entry, i) => (
+            <li key={i} className="relative text-xs">
+              <span
+                className={cn(
+                  "absolute -left-[21px] top-1 h-2 w-2 rounded-full",
+                  entry.actor === "agent" ? "bg-primary" : "bg-accent"
+                )}
+              />
+              <span className="font-medium text-foreground">{entry.action}</span>
+              <span className="ml-1.5 text-muted-foreground/70">
+                · {entry.actor === "agent" ? "agent" : "governance layer"}
+              </span>
+              <p className="mt-0.5 text-muted-foreground">{entry.detail}</p>
+            </li>
+          ))}
+        </ol>
+      )}
+      <p className="text-[11px] text-muted-foreground/60">
+        Also saved to the Audit Log tab.
       </p>
-      <ol className="space-y-2 border-l border-border/60 pl-4">
-        {trail.map((entry, i) => (
-          <li key={i} className="relative text-xs">
-            <span
-              className={cn(
-                "absolute -left-[21px] top-1 h-2 w-2 rounded-full",
-                entry.actor === "agent" ? "bg-primary" : "bg-accent"
-              )}
-            />
-            <span className="font-medium text-foreground">{entry.action}</span>
-            <span className="ml-1.5 text-muted-foreground/70">
-              · {entry.actor === "agent" ? "agent" : "governance layer"}
-            </span>
-            <p className="mt-0.5 text-muted-foreground">{entry.detail}</p>
-          </li>
-        ))}
-      </ol>
     </div>
   );
 }

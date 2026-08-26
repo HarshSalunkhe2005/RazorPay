@@ -122,3 +122,21 @@ export interface BatchRunResponse {
   summary: BatchSummary;
   results: BatchRunResult[];
 }
+
+/**
+ * One centralized, persisted record of a governed run - single-case or batch. This is
+ * the thing that used to only live inside a dialog's component state and would
+ * disappear once closed; now every run appends one of these to a durable log
+ * (see lib/audit-log.ts) so nothing gets lost.
+ */
+export interface AuditLogRecord {
+  id: string;
+  paymentId: string;
+  customerName: string;
+  amount: number;
+  source: "single" | "batch";
+  escalationAction: EscalationAction;
+  recoverabilityScore?: number; // absent when a pre-check stopped the case before the agent ran
+  entries: AuditEntry[];
+  recordedAt: string;
+}

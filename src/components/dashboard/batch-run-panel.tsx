@@ -8,15 +8,18 @@ import {
   BatchRunResult,
   FailedPayment,
   PaymentStatus,
+  AuditLogRecord,
   isPrecheckStop,
   Channel,
 } from "@/lib/types";
 import { formatINR, channelLabel } from "@/lib/format";
+import { buildAuditLogRecord } from "@/lib/audit-log";
 import { cn } from "@/lib/utils";
 
 interface BatchRunPanelProps {
   payments: FailedPayment[];
   onBatchComplete: (updates: { paymentId: string; status: PaymentStatus }[]) => void;
+  onAuditLogAppend: (records: AuditLogRecord[]) => void;
 }
 
 function outcomeStatus(result: BatchRunResult): PaymentStatus {
@@ -29,7 +32,7 @@ function outcomeStatus(result: BatchRunResult): PaymentStatus {
 
 const CHANNELS: Channel[] = ["email", "sms", "whatsapp", "voice_call"];
 
-export function BatchRunPanel({ payments, onBatchComplete }: BatchRunPanelProps) {
+export function BatchRunPanel({ payments, onBatchComplete, onAuditLogAppend }: BatchRunPanelProps) {
   const [running, setRunning] = useState(false);
   const [response, setResponse] = useState<BatchRunResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -61,6 +64,17 @@ export function BatchRunPanel({ payments, onBatchComplete }: BatchRunPanelProps)
       setResponse(data);
       onBatchComplete(
         data.results.map((r) => ({ paymentId: r.paymentId, status: outcomeStatus(r) }))
+      );
+      onAuditLogAppend(
+        data.results.map((r) =>
+          buildAuditLogRecord({
+            paymentId: r.paymentId,
+            customerName: r.customerName,
+            amount: r.amount,
+            outcome: r.outcome,
+            source: "batch",
+          })
+        )
       );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
