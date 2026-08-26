@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Table,
   TableBody,
@@ -11,7 +11,15 @@ import {
 } from "@/components/ui/table";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { FailedPayment, AgentResult } from "@/lib/types";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { FailedPayment, AgentOutcome, PaymentStatus, isPrecheckStop } from "@/lib/types";
 import { formatINR, formatDate, failureReasonLabel, initials } from "@/lib/format";
 import { StatusBadge } from "./status-badge";
 import { AgentTraceDialog } from "./agent-trace-dialog";
@@ -22,10 +30,37 @@ interface PaymentsTableProps {
   onStatusChange: (paymentId: string, status: FailedPayment["status"]) => void;
 }
 
+const RESOLVED_STATUSES: PaymentStatus[] = ["recovered", "lost", "escalated", "write_off"];
+const STATUS_FILTERS: { value: PaymentStatus | "all"; label: string }[] = [
+  { value: "all", label: "All statuses" },
+  { value: "failed", label: "Failed" },
+  { value: "in_progress", label: "Agent running" },
+  { value: "contacted", label: "Contacted" },
+  { value: "recovered", label: "Recovered" },
+  { value: "escalated", label: "Escalated" },
+  { value: "write_off", label: "Write-off" },
+  { value: "lost", label: "Lost" },
+];
+
 export function PaymentsTable({ payments, onStatusChange }: PaymentsTableProps) {
   const [activePayment, setActivePayment] = useState<FailedPayment | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [results, setResults] = useState<Record<string, AgentResult>>({});
+  const [outcomes, setOutcomes] = useState<Record<string, AgentOutcome>>({});
+  const [query, setQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<PaymentStatus | "all">("all");
+
+  const filtered = useMemo(() => {
+    return payments.filter((p) => {
+      const matchesStatus = statusFilter === "all" || p.status === statusFilter;
+      const q = query.trim().toLowerCase();
+      const matchesQuery =
+        q.length === 0 ||
+        p.customerName.toLowerCase().includes(q) ||
+        p.customerEmail.toLowerCase().includes(q) ||
+        p.planName.toLowerCase().includes(q);
+      return matchesStatus && matchesQuery;
+    });
+  }, [payments, query, statusFilter]);
 
   function handleRun(payment: FailedPayment) {
     setActivePayment(payment);
@@ -35,13 +70,39 @@ export function PaymentsTable({ payments, onStatusChange }: PaymentsTableProps) 
     }
   }
 
-  function handleComplete(paymentId: string, result: AgentResult) {
-    setResults((prev) => ({ ...prev, [paymentId]: result }));
-    onStatusChange(paymentId, "contacted");
+  function handleComplete(paymentId: string, outcome: AgentOutcome) {
+    setOutcomes((prev) => ({ ...prev, [paymentId]: outcome }));
+    const nextStatus: PaymentStatus = isPrecheckStop(outcome)
+      ? "escalated"
+      : outcome.escalation.action === "stop_write_off"
+        ? "write_off"
+        : "contacted";
+    onStatusChange(paymentId, nextStatus);
   }
 
   return (
     <>
+      <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <Input
+          placeholder="Search customer, email, or plan…"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          className="sm:max-w-xs"
+        />
+        <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as PaymentStatus | "all")}>
+          <SelectTrigger className="sm:w-48">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {STATUS_FILTERS.map((f) => (
+              <SelectItem key={f.value} value={f.value}>
+                {f.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
       <div className="overflow-hidden rounded-2xl border border-border/60">
         <div className="overflow-x-auto">
           <Table>
@@ -56,8 +117,16 @@ export function PaymentsTable({ payments, onStatusChange }: PaymentsTableProps) 
               </TableRow>
             </TableHeader>
             <TableBody>
-              {payments.map((payment) => {
-                const hasResult = Boolean(results[payment.id]);
+              {filtered.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={6} className="py-10 text-center text-sm text-muted-foreground">
+                    No payments match this filter.
+                  </TableCell>
+                </TableRow>
+              )}
+              {filtered.map((payment) => {
+                const hasResult = Boolean(outcomes[payment.id]);
+                const resolved = RESOLVED_STATUSES.includes(payment.status);
                 return (
                   <TableRow key={payment.id} className="group">
                     <TableCell>
@@ -126,6 +195,9 @@ export function PaymentsTable({ payments, onStatusChange }: PaymentsTableProps) 
                               Lost
                             </Button>
                           </>
+                        )}
+                        {resolved && payment.status !== "recovered" && payment.status !== "lost" && (
+                          <span className="text-xs text-muted-foreground">closed by policy</span>
                         )}
                       </div>
                     </TableCell>

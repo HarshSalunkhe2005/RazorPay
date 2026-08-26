@@ -1,7 +1,13 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
-import { FailedPayment, AgentResult } from "./types";
+import { FailedPayment, AgentResult, AgentOutcome, AuditEntry } from "./types";
+import {
+  precheckAttempts,
+  postcheckRecoverability,
+  auditEntry,
+  MAX_AUTOMATED_ATTEMPTS,
+} from "./escalation";
 
 const client = new Anthropic();
 
@@ -53,7 +59,33 @@ function buildUserPrompt(payment: FailedPayment): string {
 Produce the full 4-stage recovery plan as structured output.`;
 }
 
-export async function runRecoveryAgent(payment: FailedPayment): Promise<AgentResult> {
+/**
+ * Runs one payment through the full governed pipeline:
+ * pre-check (deterministic) -> LLM reasoning -> post-check (score-driven) -> audit trail.
+ * See lib/escalation.ts for what the checks do and why they live outside the model.
+ */
+export async function runRecoveryAgent(payment: FailedPayment): Promise<AgentOutcome> {
+  const trail: AuditEntry[] = [];
+
+  const precheck = precheckAttempts(payment);
+  if (precheck) {
+    trail.push(
+      auditEntry(
+        "governance",
+        "pre-check: max-attempts rule",
+        `${precheck.reason} Agent was not invoked for this run.`
+      )
+    );
+    return { paymentId: payment.id, escalation: precheck, auditTrail: trail, skippedAgent: true };
+  }
+  trail.push(
+    auditEntry(
+      "governance",
+      "pre-check: max-attempts rule",
+      `Attempt ${payment.attemptNumber}/${MAX_AUTOMATED_ATTEMPTS} - within policy, proceeding to agent.`
+    )
+  );
+
   const response = await client.messages.parse({
     model: "claude-opus-5",
     max_tokens: 16000,
@@ -70,7 +102,24 @@ export async function runRecoveryAgent(payment: FailedPayment): Promise<AgentRes
     throw new Error("Recovery agent failed to produce structured output");
   }
 
-  return {
+  trail.push(
+    auditEntry(
+      "agent",
+      "4-stage recovery plan generated",
+      `Recoverability ${parsed.recoverabilityScore}/100 · root cause: ${parsed.rootCause}`
+    )
+  );
+
+  const postcheck = postcheckRecoverability(parsed.recoverabilityScore);
+  trail.push(
+    auditEntry(
+      "governance",
+      "post-check: write-off threshold rule",
+      postcheck.reason
+    )
+  );
+
+  const result: AgentResult = {
     paymentId: payment.id,
     recoverabilityScore: parsed.recoverabilityScore,
     rootCause: parsed.rootCause,
@@ -80,6 +129,10 @@ export async function runRecoveryAgent(payment: FailedPayment): Promise<AgentRes
     message: parsed.message,
     retryLink: `https://rzp.io/retry/${payment.subscriptionId.toLowerCase()}`,
     steps: parsed.steps,
+    escalation: postcheck,
+    auditTrail: trail,
     generatedAt: new Date().toISOString(),
   };
+
+  return result;
 }

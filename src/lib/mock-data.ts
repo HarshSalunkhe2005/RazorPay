@@ -138,6 +138,23 @@ export const failedPayments: FailedPayment[] = [
     customerTenureMonths: 18,
     preferredLanguage: "English",
   },
+  {
+    id: "pay_F009",
+    customerName: "Farhan Sheikh",
+    customerEmail: "farhan.sheikh@example.com",
+    customerPhone: "+91 93210 45678",
+    amount: 1299,
+    currency: "INR",
+    planName: "Starter Monthly",
+    failureReason: "bank_decline",
+    failedAt: "2026-08-19T08:05:00Z",
+    attemptNumber: 3,
+    subscriptionId: "sub_A109",
+    status: "failed",
+    previousSuccessfulPayments: 0,
+    customerTenureMonths: 1,
+    preferredLanguage: "Hinglish",
+  },
 ];
 
 export function getPaymentById(id: string): FailedPayment | undefined {

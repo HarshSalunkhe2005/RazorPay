@@ -10,7 +10,14 @@ import {
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { FailedPayment, AgentResult, AgentStep } from "@/lib/types";
+import {
+  FailedPayment,
+  AgentOutcome,
+  AgentResult,
+  AgentStep,
+  AuditEntry,
+  isPrecheckStop,
+} from "@/lib/types";
 import { formatINR, channelLabel, incentiveLabel } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -76,15 +83,56 @@ function ThinkingSkeleton() {
   );
 }
 
+const ESCALATION_BANNER: Record<
+  "escalate_human_review" | "stop_write_off",
+  { label: string; className: string }
+> = {
+  escalate_human_review: {
+    label: "Escalated to human review — stopping rule fired before the agent ran",
+    className: "border-violet-500/30 bg-violet-500/10 text-violet-600 dark:text-violet-400",
+  },
+  stop_write_off: {
+    label: "Plan drafted but not executed — below the write-off threshold",
+    className: "border-orange-500/30 bg-orange-500/10 text-orange-600 dark:text-orange-400",
+  },
+};
+
+function AuditLog({ trail }: { trail: AuditEntry[] }) {
+  return (
+    <div className="space-y-2">
+      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        Audit trail
+      </p>
+      <ol className="space-y-2 border-l border-border/60 pl-4">
+        {trail.map((entry, i) => (
+          <li key={i} className="relative text-xs">
+            <span
+              className={cn(
+                "absolute -left-[21px] top-1 h-2 w-2 rounded-full",
+                entry.actor === "agent" ? "bg-primary" : "bg-accent"
+              )}
+            />
+            <span className="font-medium text-foreground">{entry.action}</span>
+            <span className="ml-1.5 text-muted-foreground/70">
+              · {entry.actor === "agent" ? "agent" : "governance layer"}
+            </span>
+            <p className="mt-0.5 text-muted-foreground">{entry.detail}</p>
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
+
 interface AgentRunProps {
   payment: FailedPayment;
-  onComplete: (paymentId: string, result: AgentResult) => void;
+  onComplete: (paymentId: string, outcome: AgentOutcome) => void;
 }
 
 /** Keyed by payment.id from the parent so a fresh fetch + fresh state runs per payment,
  * without ever calling setState synchronously inside the effect body. */
 function AgentRun({ payment, onComplete }: AgentRunProps) {
-  const [result, setResult] = useState<AgentResult | null>(null);
+  const [outcome, setOutcome] = useState<AgentOutcome | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -99,10 +147,10 @@ function AgentRun({ payment, onComplete }: AgentRunProps) {
           const body = await res.json().catch(() => ({}));
           throw new Error(body?.error ?? "Agent run failed");
         }
-        return res.json() as Promise<AgentResult>;
+        return res.json() as Promise<AgentOutcome>;
       })
       .then((data) => {
-        setResult(data);
+        setOutcome(data);
         onComplete(payment.id, data);
       })
       .catch((err) => setError(err.message ?? "Something went wrong"))
@@ -119,12 +167,31 @@ function AgentRun({ payment, onComplete }: AgentRunProps) {
         </div>
       )}
 
-      {result && <AgentResultView result={result} />}
+      {outcome && isPrecheckStop(outcome) && (
+        <div className="space-y-4">
+          <div
+            className={cn(
+              "rounded-lg border p-4 text-sm",
+              ESCALATION_BANNER.escalate_human_review.className
+            )}
+          >
+            {ESCALATION_BANNER.escalate_human_review.label}
+          </div>
+          <AuditLog trail={outcome.auditTrail} />
+        </div>
+      )}
+
+      {outcome && !isPrecheckStop(outcome) && <AgentResultView result={outcome} />}
     </>
   );
 }
 
 function AgentResultView({ result }: { result: AgentResult }) {
+  const banner =
+    result.escalation.action !== "proceed"
+      ? ESCALATION_BANNER[result.escalation.action as "stop_write_off"]
+      : null;
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap gap-2">
@@ -135,6 +202,10 @@ function AgentResultView({ result }: { result: AgentResult }) {
         <Badge variant="outline">{incentiveLabel(result.recommendedIncentive)}</Badge>
       </div>
 
+      {banner && (
+        <div className={cn("rounded-lg border p-3 text-sm", banner.className)}>{banner.label}</div>
+      )}
+
       <div className="space-y-3">
         {result.steps.map((step, i) => (
           <StepCard key={step.stage} step={step} index={i} />
@@ -143,7 +214,7 @@ function AgentResultView({ result }: { result: AgentResult }) {
 
       <div className="rounded-xl border border-primary/20 bg-primary/5 p-4">
         <p className="text-xs font-medium uppercase tracking-wide text-primary">
-          Drafted message
+          Drafted message {result.escalation.action !== "proceed" && "(not sent — see above)"}
         </p>
         <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-foreground">
           {result.message}
@@ -157,6 +228,8 @@ function AgentResultView({ result }: { result: AgentResult }) {
           {result.retryLink}
         </a>
       </div>
+
+      <AuditLog trail={result.auditTrail} />
     </div>
   );
 }
@@ -165,7 +238,7 @@ interface AgentTraceDialogProps {
   payment: FailedPayment | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onComplete: (paymentId: string, result: AgentResult) => void;
+  onComplete: (paymentId: string, outcome: AgentOutcome) => void;
 }
 
 export function AgentTraceDialog({

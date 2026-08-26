@@ -23,6 +23,14 @@ const STATUS_CONFIG: Record<PaymentStatus, { label: string; className: string }>
     label: "Lost",
     className: "bg-zinc-500/10 text-zinc-600 dark:text-zinc-400 border-zinc-500/20",
   },
+  escalated: {
+    label: "Escalated · human review",
+    className: "bg-violet-500/10 text-violet-600 dark:text-violet-400 border-violet-500/20",
+  },
+  write_off: {
+    label: "Write-off",
+    className: "bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/20",
+  },
 };
 
 export function StatusBadge({ status }: { status: PaymentStatus }) {

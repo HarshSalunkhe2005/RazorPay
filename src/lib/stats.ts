@@ -9,6 +9,9 @@ export interface DashboardStats {
   recoveredAmount: number;
   lostCount: number;
   lostAmount: number;
+  escalatedCount: number;
+  writeOffCount: number;
+  writeOffAmount: number;
   recoveryRate: number; // % of (recovered + lost) resolved payments that were recovered
 }
 
@@ -29,6 +32,12 @@ export function computeStats(payments: FailedPayment[]): DashboardStats {
   const lostCount = lost.length;
   const lostAmount = lost.reduce((sum, p) => sum + p.amount, 0);
 
+  const escalatedCount = payments.filter((p) => p.status === "escalated").length;
+
+  const writeOff = payments.filter((p) => p.status === "write_off");
+  const writeOffCount = writeOff.length;
+  const writeOffAmount = writeOff.reduce((sum, p) => sum + p.amount, 0);
+
   const resolved = recoveredCount + lostCount;
   const recoveryRate = resolved === 0 ? 0 : Math.round((recoveredCount / resolved) * 100);
 
@@ -41,6 +50,9 @@ export function computeStats(payments: FailedPayment[]): DashboardStats {
     recoveredAmount,
     lostCount,
     lostAmount,
+    escalatedCount,
+    writeOffCount,
+    writeOffAmount,
     recoveryRate,
   };
 }

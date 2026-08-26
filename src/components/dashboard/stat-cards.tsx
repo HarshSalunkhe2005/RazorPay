@@ -77,16 +77,14 @@ export function StatCards({ stats }: { stats: DashboardStats }) {
           sub="failed + contacted"
         />
         <MiniStat
-          title="Lost"
-          value={formatINR(stats.lostAmount)}
-          sub={`${stats.lostCount} unrecovered`}
-          tone="destructive"
+          title="Escalated"
+          value={String(stats.escalatedCount)}
+          sub="max-attempts stopping rule"
         />
         <MiniStat
-          title="Recovered"
-          value={String(stats.recoveredCount)}
-          sub="cases closed won"
-          tone="success"
+          title="Write-offs"
+          value={formatINR(stats.writeOffAmount)}
+          sub={`${stats.writeOffCount} below recoverability floor`}
         />
       </div>
     </div>
