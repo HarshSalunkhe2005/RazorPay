@@ -10,7 +10,7 @@ import {
 
 const client = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
-const MODEL = "gemini-2.5-flash";
+const MODEL = "gemini-3.6-flash";
 
 const AgentStepSchema = z.object({
   stage: z.enum(["classify", "strategize", "draft", "action"]),

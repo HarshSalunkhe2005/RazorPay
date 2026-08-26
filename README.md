@@ -15,7 +15,7 @@ The dashboard shows this reasoning live (staggered reveal, not a single opaque L
 
 - **Next.js 16** (App Router) + TypeScript + Tailwind CSS
 - **shadcn/ui** components
-- **Gemini API** (`@google/genai`, model `gemini-2.5-flash`) with structured JSON outputs (`responseJsonSchema`, validated with Zod) driving the 4-stage agent pipeline
+- **Gemini API** (`@google/genai`, model `gemini-3.6-flash`) with structured JSON outputs (`responseJsonSchema`, validated with Zod) driving the 4-stage agent pipeline
 - Seeded mock dataset simulating Razorpay failed-payment/subscription-renewal webhook events — no live payments account required to demo
 
 ## Getting started

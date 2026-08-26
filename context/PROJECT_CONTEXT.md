@@ -48,7 +48,7 @@ builders and goes straight to panel review.
 |---|---|---|
 | Framework | Next.js 16 (App Router) + TypeScript | Single deployable app, fast to ship, judges get a live URL |
 | Styling | Tailwind CSS + shadcn/ui | Fast, and the design tokens were hand-tuned (see §4) so it doesn't read as default shadcn |
-| AI | Gemini API (`@google/genai`), model `gemini-2.5-flash` | Structured JSON outputs (`responseMimeType`/`responseJsonSchema`, validated with Zod) drive the 4-stage agent pipeline. Switched from Claude/Anthropic — see §5.7 |
+| AI | Gemini API (`@google/genai`), model `gemini-3.6-flash` | Structured JSON outputs (`responseMimeType`/`responseJsonSchema`, validated with Zod) drive the 4-stage agent pipeline. Switched from Claude/Anthropic — see §5.7 |
 | Validation | Zod | Schema for the agent's structured output |
 | Charts/format | Geist Sans + Geist Mono (tabular-nums for all money figures) | Small detail, reads as "fintech" not "generic dashboard" |
 
@@ -138,8 +138,16 @@ Chronological, most useful for "why does the code look like this."
    fix — and re-verified the request/response shape against the real installed SDK
    (`@google/genai`) rather than trust a docs-fetch summary, which had confidently
    described a nonexistent `interactions.create()` API. Net effect: same architecture,
-   `src/lib/agent.ts` now targets `gemini-2.5-flash` via `models.generateContent` with
+   `src/lib/agent.ts` now targets `gemini-3.6-flash` via `models.generateContent` with
    `responseJsonSchema`, env var renamed `ANTHROPIC_API_KEY` → `GEMINI_API_KEY`.
+8. **First live deployed test failed**: `gemini-2.5-flash` returned `404 NOT_FOUND` —
+   "This model ... is no longer available to new users. Please update your code to use
+   models/gemini-3.6-flash." Caught from actual Vercel runtime logs (user pulled them via
+   the dashboard's log export), not from docs — the installed SDK's own bundled README
+   examples were already stale for a key created this late. Fixed by switching `MODEL` to
+   `gemini-3.6-flash` in `src/lib/agent.ts`. Lesson repeated from §5.7: for a fast-moving
+   provider, the live API's own error response is more trustworthy than any cached
+   docs/SDK example — trust it over what's written down when the two disagree.
 
 ---
 
