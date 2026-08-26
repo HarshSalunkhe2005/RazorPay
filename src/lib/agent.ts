@@ -1,6 +1,5 @@
-import Anthropic from "@anthropic-ai/sdk";
+import { GoogleGenAI } from "@google/genai";
 import { z } from "zod";
-import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { FailedPayment, AgentResult, AgentOutcome, AuditEntry } from "./types";
 import {
   precheckAttempts,
@@ -9,7 +8,9 @@ import {
   MAX_AUTOMATED_ATTEMPTS,
 } from "./escalation";
 
-const client = new Anthropic();
+const client = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+
+const MODEL = "gemini-2.5-flash";
 
 const AgentStepSchema = z.object({
   stage: z.enum(["classify", "strategize", "draft", "action"]),
@@ -34,6 +35,48 @@ const AgentOutputSchema = z.object({
   steps: z.array(AgentStepSchema).length(4),
 });
 
+// Gemini's responseJsonSchema takes a plain JSON Schema object (not a Zod schema
+// directly) - kept in sync with AgentOutputSchema above, which still does the runtime
+// validation/parsing once a response comes back.
+const RESPONSE_JSON_SCHEMA = {
+  type: "object",
+  properties: {
+    recoverabilityScore: { type: "number" },
+    rootCause: { type: "string" },
+    recommendedChannel: { type: "string", enum: ["email", "sms", "whatsapp", "voice_call"] },
+    recommendedTiming: { type: "string" },
+    recommendedIncentive: {
+      type: "string",
+      enum: ["none", "grace_period_3d", "discount_10", "discount_20", "fee_waiver"],
+    },
+    message: { type: "string" },
+    steps: {
+      type: "array",
+      minItems: 4,
+      maxItems: 4,
+      items: {
+        type: "object",
+        properties: {
+          stage: { type: "string", enum: ["classify", "strategize", "draft", "action"] },
+          title: { type: "string" },
+          reasoning: { type: "string" },
+          output: { type: "object", additionalProperties: { type: "string" } },
+        },
+        required: ["stage", "title", "reasoning", "output"],
+      },
+    },
+  },
+  required: [
+    "recoverabilityScore",
+    "rootCause",
+    "recommendedChannel",
+    "recommendedTiming",
+    "recommendedIncentive",
+    "message",
+    "steps",
+  ],
+};
+
 const SYSTEM_PROMPT = `You are the Recovery Agent for a payments platform, modeled on Razorpay's AI Buildathon "Revenue Recovery" track.
 
 Given one failed payment/subscription-renewal event, work through four explicit reasoning stages and return them all:
@@ -44,7 +87,9 @@ Given one failed payment/subscription-renewal event, work through four explicit 
 
 Each step's "reasoning" field should read like real analyst thinking (2-4 sentences), and "output" must be a flat string-to-string map of the concrete decision fields for that step (e.g. {"root_cause": "...", "recoverability_score": "72"}).
 
-Be decisive and specific to the given customer data - do not give generic advice.`;
+Be decisive and specific to the given customer data - do not give generic advice.
+
+Respond with ONLY the JSON object matching the required schema - no prose, no markdown fences.`;
 
 function buildUserPrompt(payment: FailedPayment): string {
   return `Failed payment event:
@@ -86,21 +131,22 @@ export async function runRecoveryAgent(payment: FailedPayment): Promise<AgentOut
     )
   );
 
-  const response = await client.messages.parse({
-    model: "claude-opus-5",
-    max_tokens: 16000,
-    system: SYSTEM_PROMPT,
-    messages: [{ role: "user", content: buildUserPrompt(payment) }],
-    output_config: {
-      format: zodOutputFormat(AgentOutputSchema),
-      effort: "medium",
+  const response = await client.models.generateContent({
+    model: MODEL,
+    contents: buildUserPrompt(payment),
+    config: {
+      systemInstruction: SYSTEM_PROMPT,
+      responseMimeType: "application/json",
+      responseJsonSchema: RESPONSE_JSON_SCHEMA,
     },
   });
 
-  const parsed = response.parsed_output;
-  if (!parsed) {
-    throw new Error("Recovery agent failed to produce structured output");
+  const raw = response.text;
+  if (!raw) {
+    throw new Error("Recovery agent returned an empty response");
   }
+
+  const parsed = AgentOutputSchema.parse(JSON.parse(raw));
 
   trail.push(
     auditEntry(
@@ -112,11 +158,7 @@ export async function runRecoveryAgent(payment: FailedPayment): Promise<AgentOut
 
   const postcheck = postcheckRecoverability(parsed.recoverabilityScore);
   trail.push(
-    auditEntry(
-      "governance",
-      "post-check: write-off threshold rule",
-      postcheck.reason
-    )
+    auditEntry("governance", "post-check: write-off threshold rule", postcheck.reason)
   );
 
   const result: AgentResult = {

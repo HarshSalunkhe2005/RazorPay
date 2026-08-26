@@ -15,14 +15,14 @@ The dashboard shows this reasoning live (staggered reveal, not a single opaque L
 
 - **Next.js 16** (App Router) + TypeScript + Tailwind CSS
 - **shadcn/ui** components
-- **Claude API** (`@anthropic-ai/sdk`, model `claude-opus-5`) with structured JSON outputs (Zod schema) driving the 4-stage agent pipeline
+- **Gemini API** (`@google/genai`, model `gemini-2.5-flash`) with structured JSON outputs (`responseJsonSchema`, validated with Zod) driving the 4-stage agent pipeline
 - Seeded mock dataset simulating Razorpay failed-payment/subscription-renewal webhook events — no live payments account required to demo
 
 ## Getting started
 
 ```bash
 npm install
-cp .env.example .env.local   # add your ANTHROPIC_API_KEY
+cp .env.example .env.local   # add your GEMINI_API_KEY (get one at aistudio.google.com/apikey)
 npm run dev
 ```
 
@@ -35,14 +35,20 @@ src/
   app/
     page.tsx              Dashboard shell
     api/agent/route.ts     API route that runs the recovery agent for one payment
-  components/dashboard/    Stat cards, payments table, agent trace dialog
+    api/agent/batch/route.ts  API route that runs the agent across all open cases
+  components/dashboard/    Stat cards, payments table, agent trace dialog, batch run panel, architecture view
   lib/
     types.ts               Shared domain types
     mock-data.ts            Seeded failed-payment dataset
-    agent.ts                 The 4-stage Claude agent pipeline
+    agent.ts                 The 4-stage Gemini agent pipeline
+    escalation.ts             Governance layer: pre-check/post-check stopping rules
+    simulate.ts                Demo-only simulated payment outcome for batch metrics
     stats.ts / format.ts       Derived dashboard stats + formatting helpers
 ```
 
+See `context/PROJECT_CONTEXT.md` for the full decision log, requirements sourced from
+the buildathon page, and what's still deferred.
+
 ## Deploying
 
-Any Vercel/Node host works. Set `ANTHROPIC_API_KEY` as a server-side environment variable — it is never exposed to the client.
+Any Vercel/Node host works. Set `GEMINI_API_KEY` as a server-side environment variable — it is never exposed to the client.

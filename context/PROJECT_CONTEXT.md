@@ -48,7 +48,7 @@ builders and goes straight to panel review.
 |---|---|---|
 | Framework | Next.js 16 (App Router) + TypeScript | Single deployable app, fast to ship, judges get a live URL |
 | Styling | Tailwind CSS + shadcn/ui | Fast, and the design tokens were hand-tuned (see §4) so it doesn't read as default shadcn |
-| AI | Claude API (`@anthropic-ai/sdk`), model `claude-opus-5` | Structured JSON outputs (Zod schema via `messages.parse`) drive the 4-stage agent pipeline |
+| AI | Gemini API (`@google/genai`), model `gemini-2.5-flash` | Structured JSON outputs (`responseMimeType`/`responseJsonSchema`, validated with Zod) drive the 4-stage agent pipeline. Switched from Claude/Anthropic — see §5.7 |
 | Validation | Zod | Schema for the agent's structured output |
 | Charts/format | Geist Sans + Geist Mono (tabular-nums for all money figures) | Small detail, reads as "fintech" not "generic dashboard" |
 
@@ -80,10 +80,16 @@ Next.js API routes, deliberately, so there's nothing extra to keep alive for a l
   overlays only, neumorphic dual-shadow stat tiles, tabular-nums money figures. See
   `src/app/globals.css` utilities: `.bg-mesh`, `.glass-panel`, `.neu-tile`,
   `.text-gradient-brand`, `.glow-ring`, `.font-figures`.
-- **Single Claude call per case, not 4 separate calls.** The agent produces all 4
+- **Single LLM call per case, not 4 separate calls.** The agent produces all 4
   reasoning stages (classify/strategize/draft/action) in one structured-output call, then
   the UI reveals them staggered client-side. Cheaper and faster than 4 round-trips; still
   visibly "agentic" because the reasoning is genuinely multi-stage, just batched.
+- **Gemini over Claude for the model provider** (see §5.7). Functionally equivalent
+  architecture either way — this was a provider preference, not a capability gap. Verified
+  the actual installed `@google/genai` SDK's own type definitions and README before
+  writing code, rather than trusting a docs-page fetch summary that had hallucinated a
+  nonexistent `interactions.create()` API — worth remembering next time a fast-moving
+  SDK's docs need checking.
 
 ---
 
@@ -120,6 +126,20 @@ Chronological, most useful for "why does the code look like this."
    razorpay.com/buildathon/ (§2) once asked to "go through it properly" — this surfaced
    the batch-metrics and escalation/stopping-rule requirements that the secondhand summary
    had missed, and the doc/audit-trail requirements.
+7. **Considered training a self-hosted SLM instead of using any foundation-model API**,
+   over concern that "inserting a key" looked weak. Talked through the actual tradeoffs:
+   fine-tuning + hosting a small model in the remaining timeline is a real reliability
+   risk (needs an always-on second service, exactly what the single-deployable-app
+   decision in §4 was avoiding), and it doesn't even address the underlying concern since
+   a self-hosted model still needs a credential/endpoint pointing at it. Settled on:
+   keep the API-based LLM approach (industry standard), reserve genuine model *training*
+   for the narrow, well-scoped recoverability classifier in §7 instead. Then, separately,
+   switched providers from Claude/Anthropic to Gemini — a preference, not a capability
+   fix — and re-verified the request/response shape against the real installed SDK
+   (`@google/genai`) rather than trust a docs-fetch summary, which had confidently
+   described a nonexistent `interactions.create()` API. Net effect: same architecture,
+   `src/lib/agent.ts` now targets `gemini-2.5-flash` via `models.generateContent` with
+   `responseJsonSchema`, env var renamed `ANTHROPIC_API_KEY` → `GEMINI_API_KEY`.
 
 ---
 
@@ -155,7 +175,7 @@ get to it:
 
 ## 8. Current feature state
 
-- ✅ Single-case run: 4-stage Claude pipeline, staggered reveal, glass-panel dialog
+- ✅ Single-case run: 4-stage Gemini pipeline, staggered reveal, glass-panel dialog
 - ✅ Governance layer: pre-check (max attempts) + post-check (write-off threshold),
   both outside the LLM, both logged to a per-case audit trail
 - ✅ Batch run: processes all open cases with bounded concurrency (3), aggregate ₹
@@ -172,10 +192,10 @@ get to it:
 
 ```bash
 npm install
-cp .env.example .env.local   # set ANTHROPIC_API_KEY
+cp .env.example .env.local   # set GEMINI_API_KEY (get one at aistudio.google.com/apikey)
 npm run dev
 ```
 
-`ANTHROPIC_API_KEY` is server-side only (used in `src/lib/agent.ts`, called from
+`GEMINI_API_KEY` is server-side only (used in `src/lib/agent.ts`, called from
 `src/app/api/agent/route.ts` and `src/app/api/agent/batch/route.ts`). Never exposed to
 the client, never committed — `.gitignore` excludes `.env*` except `.env.example`.
