@@ -53,7 +53,7 @@ export function ArchitectureView() {
           <Arrow label="within policy" />
           <FlowNode
             title="Recovery Agent"
-            sub="Claude · classify → strategize → draft → act"
+            sub="Gemini · classify → strategize → draft → act"
             variant="agent"
           />
           <Arrow label="scored" />
@@ -107,7 +107,7 @@ export function ArchitectureView() {
         <div className="rounded-2xl border border-border/60 p-5">
           <p className="text-sm font-medium text-foreground">Stack</p>
           <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-            Next.js 16 (App Router) + TypeScript + Tailwind, shadcn/ui components, Claude API
+            Next.js 16 (App Router) + TypeScript + Tailwind, shadcn/ui components, Gemini API
             (structured JSON outputs via Zod) for the reasoning stages, all server-side —
             deployable as a single app with no separate services to keep alive for a demo.
           </p>
