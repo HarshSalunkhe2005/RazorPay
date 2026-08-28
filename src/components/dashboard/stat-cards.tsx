@@ -1,6 +1,7 @@
 import { DashboardStats } from "@/lib/stats";
 import { formatINR } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { RadialGauge } from "./radial-gauge";
 
 function MiniStat({
   title,
@@ -42,26 +43,33 @@ export function StatCards({ stats }: { stats: DashboardStats }) {
           aria-hidden
           className="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-[radial-gradient(circle,oklch(0.63_0.19_258_/_22%),transparent_70%)]"
         />
-        <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-          Revenue recovered
-        </p>
-        <p className="mt-3 font-figures text-4xl font-semibold tabular-nums text-gradient-brand sm:text-5xl">
-          {formatINR(stats.recoveredAmount)}
-        </p>
-        <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-muted-foreground">
-          <span>
-            <span className="font-figures font-medium text-foreground">
-              {stats.recoveredCount}
-            </span>{" "}
-            payments won back
-          </span>
-          <span className="h-1 w-1 rounded-full bg-border" />
-          <span>
-            <span className="font-figures font-medium text-foreground">
-              {stats.recoveryRate}%
-            </span>{" "}
-            recovery rate
-          </span>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              Revenue recovered
+            </p>
+            <p className="mt-3 font-figures text-4xl font-semibold tabular-nums text-gradient-brand sm:text-5xl">
+              {formatINR(stats.recoveredAmount)}
+            </p>
+            <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-muted-foreground">
+              <span>
+                <span className="font-figures font-medium text-foreground">
+                  {stats.recoveredCount}
+                </span>{" "}
+                payments won back
+              </span>
+            </div>
+          </div>
+          <RadialGauge value={stats.recoveryRate} size={92} strokeWidth={7} className="hidden sm:inline-flex">
+            <div className="flex flex-col items-center">
+              <span className="font-figures text-xl font-semibold tabular-nums text-foreground">
+                {stats.recoveryRate}%
+              </span>
+              <span className="text-[9px] font-medium uppercase tracking-wider text-muted-foreground">
+                recovery rate
+              </span>
+            </div>
+          </RadialGauge>
         </div>
       </div>
 

@@ -10,6 +10,7 @@ import { PaymentsTable } from "./payments-table";
 import { BatchRunPanel } from "./batch-run-panel";
 import { ArchitectureView } from "./architecture-view";
 import { AuditLogView } from "./audit-log-view";
+import { PipelineFlow } from "./pipeline-flow";
 
 export function RecoveryDashboard({ initialPayments }: { initialPayments: FailedPayment[] }) {
   const [payments, setPayments] = useState<FailedPayment[]>(initialPayments);
@@ -51,6 +52,8 @@ export function RecoveryDashboard({ initialPayments }: { initialPayments: Failed
   return (
     <div className="space-y-6">
       <StatCards stats={stats} />
+
+      <PipelineFlow />
 
       <Tabs defaultValue="queue">
         <TabsList>

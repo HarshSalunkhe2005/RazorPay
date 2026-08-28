@@ -20,6 +20,20 @@ import {
 } from "@/lib/types";
 import { formatINR, channelLabel, incentiveLabel } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { RadialGauge } from "./radial-gauge";
+import { WRITE_OFF_SCORE_THRESHOLD } from "@/lib/escalation";
+
+/** Gradient stops per score band, matching the same red/blue/emerald vocabulary used
+ * elsewhere for destructive / neutral / success states. */
+function scoreGaugeColors(score: number) {
+  if (score < WRITE_OFF_SCORE_THRESHOLD) {
+    return { gradientFrom: "oklch(0.7 0.19 30)", gradientTo: "oklch(0.65 0.2 25)" };
+  }
+  if (score >= 70) {
+    return { gradientFrom: "oklch(0.78 0.15 165)", gradientTo: "oklch(0.72 0.17 165)" };
+  }
+  return { gradientFrom: "oklch(0.72 0.16 258)", gradientTo: "oklch(0.68 0.18 295)" };
+}
 
 const STAGE_LABELS: Record<AgentStep["stage"], string> = {
   classify: "1 · Classify",
@@ -204,14 +218,23 @@ function AgentResultView({ result }: { result: AgentResult }) {
       ? ESCALATION_BANNER[result.escalation.action as "stop_write_off"]
       : null;
 
+  const gaugeColors = scoreGaugeColors(result.recoverabilityScore);
+
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap gap-2">
-        <Badge variant="outline" className="font-figures">
-          Recoverability {result.recoverabilityScore}/100
-        </Badge>
-        <Badge variant="outline">{channelLabel(result.recommendedChannel)}</Badge>
-        <Badge variant="outline">{incentiveLabel(result.recommendedIncentive)}</Badge>
+      <div className="flex flex-wrap items-center gap-3">
+        <RadialGauge value={result.recoverabilityScore} size={52} strokeWidth={5} {...gaugeColors}>
+          <span className="font-figures text-xs font-semibold tabular-nums text-foreground">
+            {result.recoverabilityScore}
+          </span>
+        </RadialGauge>
+        <div className="flex flex-wrap gap-2">
+          <Badge variant="outline" className="font-figures">
+            Recoverability {result.recoverabilityScore}/100
+          </Badge>
+          <Badge variant="outline">{channelLabel(result.recommendedChannel)}</Badge>
+          <Badge variant="outline">{incentiveLabel(result.recommendedIncentive)}</Badge>
+        </div>
       </div>
 
       {banner && (
