@@ -18,6 +18,7 @@ const ACTION_META: Record<EscalationAction, { label: string; className: string }
   proceed: { label: "Proceeded", className: "text-primary" },
   escalate_human_review: { label: "Escalated", className: "text-violet-500" },
   stop_write_off: { label: "Write-off", className: "text-orange-500" },
+  agent_error: { label: "Failed", className: "text-destructive" },
 };
 
 interface AuditLogViewProps {
@@ -88,9 +89,23 @@ function RecordRow({ record }: { record: AuditLogRecord }) {
   );
 }
 
+function useBreakdown(records: AuditLogRecord[]) {
+  return useMemo(() => {
+    const counts: Record<EscalationAction, number> = {
+      proceed: 0,
+      escalate_human_review: 0,
+      stop_write_off: 0,
+      agent_error: 0,
+    };
+    for (const r of records) counts[r.escalationAction]++;
+    return counts;
+  }, [records]);
+}
+
 export function AuditLogView({ records, onClear }: AuditLogViewProps) {
   const [query, setQuery] = useState("");
   const [actionFilter, setActionFilter] = useState<EscalationAction | "all">("all");
+  const breakdown = useBreakdown(records);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -101,7 +116,16 @@ export function AuditLogView({ records, onClear }: AuditLogViewProps) {
   }, [records, query, actionFilter]);
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
+      {records.length > 0 && (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <BreakdownTile label="Proceeded" value={breakdown.proceed} className="text-primary" />
+          <BreakdownTile label="Escalated" value={breakdown.escalate_human_review} className="text-violet-500" />
+          <BreakdownTile label="Write-off" value={breakdown.stop_write_off} className="text-orange-500" />
+          <BreakdownTile label="Failed" value={breakdown.agent_error} className="text-destructive" />
+        </div>
+      )}
+
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-1 flex-col gap-2 sm:flex-row">
           <Input
@@ -122,6 +146,7 @@ export function AuditLogView({ records, onClear }: AuditLogViewProps) {
               <SelectItem value="proceed">Proceeded</SelectItem>
               <SelectItem value="escalate_human_review">Escalated</SelectItem>
               <SelectItem value="stop_write_off">Write-off</SelectItem>
+              <SelectItem value="agent_error">Failed</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -148,6 +173,15 @@ export function AuditLogView({ records, onClear }: AuditLogViewProps) {
           filtered.map((record) => <RecordRow key={record.id} record={record} />)
         )}
       </div>
+    </div>
+  );
+}
+
+function BreakdownTile({ label, value, className }: { label: string; value: number; className: string }) {
+  return (
+    <div className="neu-tile rounded-2xl p-4">
+      <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{label}</p>
+      <p className={cn("mt-1.5 font-figures text-xl font-semibold tabular-nums", className)}>{value}</p>
     </div>
   );
 }

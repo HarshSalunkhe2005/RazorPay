@@ -54,7 +54,8 @@ export interface AuditEntry {
 export type EscalationAction =
   | "proceed" // within policy, agent's recommended outreach is authorized to run
   | "escalate_human_review" // hit the max-attempts stopping rule, handed to a human
-  | "stop_write_off"; // recoverability too low to justify further automated contact
+  | "stop_write_off" // recoverability too low to justify further automated contact
+  | "agent_error"; // pipeline itself failed (API/parse error) - not a governance decision
 
 export interface EscalationDecision {
   action: EscalationAction;
@@ -111,6 +112,7 @@ export interface BatchSummary {
   processedCount: number;
   escalatedCount: number;
   writeOffCount: number;
+  failedCount: number; // agent pipeline threw for this case (API/parse error) - documented, not silently dropped
   simulatedRecoveredCount: number;
   simulatedRecoveredAmount: number;
   simulatedRecoveryRate: number; // % of processed (non-escalated, non-write-off) cases

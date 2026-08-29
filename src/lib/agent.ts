@@ -8,9 +8,16 @@ import {
   MAX_AUTOMATED_ATTEMPTS,
 } from "./escalation";
 
-const client = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-
 const MODEL = "gemini-3.6-flash";
+
+// Constructed lazily, not at module load - the SDK warns as soon as it's built without a
+// key, and this module gets imported during Next's build-time page-data collection where
+// no env var is set yet. The actual call sites already guard on GEMINI_API_KEY first.
+let client: GoogleGenAI | null = null;
+function getClient(): GoogleGenAI {
+  if (!client) client = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+  return client;
+}
 
 const AgentStepSchema = z.object({
   stage: z.enum(["classify", "strategize", "draft", "action"]),
@@ -131,7 +138,7 @@ export async function runRecoveryAgent(payment: FailedPayment): Promise<AgentOut
     )
   );
 
-  const response = await client.models.generateContent({
+  const response = await getClient().models.generateContent({
     model: MODEL,
     contents: buildUserPrompt(payment),
     config: {

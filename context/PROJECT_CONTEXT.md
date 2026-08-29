@@ -90,6 +90,36 @@ Next.js API routes, deliberately, so there's nothing extra to keep alive for a l
   writing code, rather than trusting a docs-page fetch summary that had hallucinated a
   nonexistent `interactions.create()` API — worth remembering next time a fast-moving
   SDK's docs need checking.
+- **UI structure/storytelling patterns borrowed from a reviewed reference site
+  (BhuAyu/PranaVeda), not its visual skin.** That site's cream/serif/Ayurveda palette
+  would fight the dark-fintech identity above, but its content shape was worth stealing:
+  a composite score front-and-center (→ `RadialGauge`, reused for both the hero
+  recovery-rate ring and the per-case recoverability score) and a governed pipeline told
+  as a visible step-by-step diagram, not buried a tab deep (→ `PipelineFlow`, promoted
+  out of the Architecture tab to sit permanently above the tabs). See
+  `src/components/dashboard/radial-gauge.tsx` and `pipeline-flow.tsx`.
+- **Batch-run failures are caught per-case, not left to crash the whole batch.** See §5.11
+  — a single API/parse error used to 502 the entire batch and discard every other case's
+  result. `EscalationAction` gained an `"agent_error"` value specifically so a pipeline
+  failure is documented in the same audit trail as a governance decision, distinguishable
+  from one, and retryable (case reverts to `PaymentStatus: "failed"`).
+- **Public routes get a best-effort in-memory per-IP rate limit** (`src/lib/rate-limit.ts`)
+  — 20 req/min on `/api/agent`, 5 req/min on `/api/agent/batch` (tighter, since one batch
+  call fans out to many Gemini calls). Not a substitute for a real gateway, but the app
+  calls a paid API with no auth in front of it and is headed for a public URL, so leaving
+  it fully open felt like the wrong default even for a demo.
+- **Dataset upload replaces the client's in-memory dataset directly, no server round trip
+  to "save" it.** Consistent with §3's "no database, client state is the record" design —
+  a CSV/JSON upload is parsed and validated in the browser (`src/lib/dataset-import.ts`),
+  and from that point on it *is* the working dataset the rest of the app already operates
+  on. This only actually works end-to-end because of §5.13's fix: the API routes take
+  full payment objects now, not ids to look up server-side.
+- **Tabs stay tabs, not routes.** Explicitly discussed with the user whether "doesn't feel
+  like a SPA" meant real per-section URLs — it didn't; the ask was a richer, more
+  distinct-feeling single page (see `SectionHeader`, entrance transitions), not a bigger
+  routing rewrite. Worth remembering if this comes up again: don't infer "convert to
+  multi-page" from "doesn't feel like an SPA" without asking, since the two aren't the
+  same complaint.
 
 ---
 
@@ -148,6 +178,57 @@ Chronological, most useful for "why does the code look like this."
    `gemini-3.6-flash` in `src/lib/agent.ts`. Lesson repeated from §5.7: for a fast-moving
    provider, the live API's own error response is more trustworthy than any cached
    docs/SDK example — trust it over what's written down when the two disagree.
+9. **A second live GitHub PAT got pasted into chat** (same failure mode as §5.1). Refused
+   again, told the user to revoke it, and this time set up push access properly instead:
+   `git-credential-manager github login --device` run from a real interactive terminal
+   (Git Bash, since GCM isn't on PowerShell's PATH), then the repo's `credential.helper`
+   repointed from a stale `store` entry to `manager`, and the remote URL given an explicit
+   username (`https://<user>@github.com/...`) so GCM knows which of two linked accounts to
+   use non-interactively. Lesson: a device-code login needs a real interactive
+   console — running it through this sandbox's non-interactive Bash hangs forever waiting
+   on a prompt it can never answer; it only works launched directly in the user's own
+   terminal.
+10. **Found a stray `.claude/launch.json`** at the primary working directory
+    (`C:\Users\Harsh`), left over from an unrelated past session that had cloned the
+    BhuAyu/PranaVeda reference site. The preview/dev-server tool reads that root
+    `launch.json`, not one placed inside this project's own clone — so `preview_start`
+    silently launched the wrong app on first try. Added a `razorpay-dev` entry alongside
+    the old one (via `npm --prefix <path> run dev`, since the launch-config schema has no
+    `cwd` field) rather than deleting the stray entry, since it wasn't ours to remove.
+11. **A real correctness bug found doing a "prod ready" pass**: `runWithConcurrencyLimit`
+    in the batch route let one case's thrown error (a Gemini API hiccup, a malformed JSON
+    response) propagate and reject the whole `Promise.all`, discarding every other case's
+    already-computed result and 502-ing the entire batch. Directly undermines the
+    buildathon's "measured across batches" and "documentation of failures, logged with
+    why" requirements. Fixed by catching per-case inside the worker and synthesizing a
+    `PrecheckStop`-shaped outcome with a new `EscalationAction` value, `"agent_error"` —
+    reusing the existing pre-check-stop shape rather than inventing a parallel result type,
+    so every place that already branches on `isPrecheckStop`/`escalation.action` handles it
+    for free. Failed cases revert to `PaymentStatus: "failed"` (retryable), not
+    mislabeled as escalated.
+12. **Vercel's `deploy --temporary` device-login timed out twice** when launched through
+    this sandbox's backgrounded Bash — same root cause as #10 above (a device code
+    needs a human to actually click the link inside the polling window; a background
+    command notification arrives asynchronously, well after the CLI's own wait timeout
+    lapses). Handed the deploy command to the user to run themselves in their own
+    terminal instead of retrying indefinitely.
+13. **The dataset-upload feature (§8) initially would have been decorative only.**
+    `/api/agent` and `/api/agent/batch` looked payments up server-side from the hardcoded
+    `mock-data.ts` array by id - so an uploaded/replaced dataset that only exists in the
+    client's React state could never actually be run through the agent; every case not in
+    the original nine would 404. Caught this before shipping it, not after. Fixed by
+    having both routes accept the full `FailedPayment` object(s) in the POST body instead
+    of an id to look up - correct anyway, since "no database, client state is the record"
+    was already the stated architecture (§3) and the id-lookup pattern was quietly
+    violating it. Added `src/lib/schemas.ts` (`FailedPaymentSchema`, Zod) as the one place
+    that validates payment data crossing the client→server trust boundary, shared between
+    the two API routes and the dataset importer.
+14. **A derived-state bug in the dataset-upload UI**: `isSample` was computed as
+    `datasetVersion === 0`, so once a version counter was bumped (even by clicking "Reset
+    to sample") it never went back to `0` and the reset button stayed visible forever.
+    Caught by actually clicking through the feature in the browser after building it, not
+    just typechecking it - `isSample` is now its own state, set explicitly by whichever
+    handler (`handleDatasetReplace` vs `handleDatasetReset`) actually ran.
 
 ---
 
@@ -189,12 +270,27 @@ get to it:
 - ✅ Batch run: processes all open cases with bounded concurrency (3), aggregate ₹
   recovered/recovery rate/channel mix/escalation counts, simulated outcomes clearly labeled
 - ✅ Recovery queue: search + status filter, per-case status badges incl. Escalated/Write-off
-- ✅ Architecture tab: pipeline diagram + rationale, in-app
+- ✅ Architecture tab: pipeline rationale cards; the pipeline diagram itself now lives
+  permanently above the tabs (see §4)
+- ✅ Composite recovery-rate gauge (hero tile) + recoverability-score gauge (agent trace
+  dialog), `RadialGauge` — see §4
 - ✅ Dark fintech design system (see §4)
+- ✅ Batch run resilient to per-case pipeline failures — documented via `agent_error`,
+  never silently drops or 502s the whole batch (see §4, §5.11)
+- ✅ Basic per-IP rate limiting on both Gemini-calling routes (see §4)
+- ✅ Themed 404 / error boundaries (`src/app/not-found.tsx`, `error.tsx`)
+- ✅ Dataset upload: CSV or JSON, replaces the working dataset end-to-end (both API
+  routes now take full payment objects, not a server-side id lookup — see §5.13),
+  partial-success row errors surfaced via toast, "reset to sample" always available
+- ✅ Each tab panel has its own `SectionHeader` (icon, accent color, one-line purpose) and
+  a fade/slide entrance transition, so the single-page tab layout reads as distinct
+  product surfaces rather than one interchangeable pane — deliberately kept as tabs, not
+  routed pages, per explicit user direction
 - ⏳ Trained recoverability model (§7)
 - ⏳ Real Razorpay test-mode retry-link generation (currently a constructed mock URL)
 - ⏳ 5-minute pitch video
-- ⏳ Deployment (Vercel) — not yet deployed to a public URL
+- ⏳ Deployment (Vercel) — CLI device-login only works from the user's own terminal (see
+  §5.12); handed off to the user to run `vercel deploy` themselves and report back the URL
 
 ## 9. Environment / running locally
 

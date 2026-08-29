@@ -166,7 +166,7 @@ function AgentRun({ payment, onComplete }: AgentRunProps) {
     fetch("/api/agent", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ paymentId: payment.id }),
+      body: JSON.stringify({ payment }),
     })
       .then(async (res) => {
         if (!res.ok) {
@@ -181,7 +181,7 @@ function AgentRun({ payment, onComplete }: AgentRunProps) {
       })
       .catch((err) => setError(err.message ?? "Something went wrong"))
       .finally(() => setLoading(false));
-  }, [payment.id, onComplete]);
+  }, [payment, onComplete]);
 
   return (
     <>

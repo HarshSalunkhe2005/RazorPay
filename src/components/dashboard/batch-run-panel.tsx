@@ -23,6 +23,9 @@ interface BatchRunPanelProps {
 }
 
 function outcomeStatus(result: BatchRunResult): PaymentStatus {
+  // A pipeline error is not a governance decision - leave the case as "failed" so it's
+  // still eligible to be retried, rather than mislabeling it as escalated or written off.
+  if (result.outcome.escalation.action === "agent_error") return "failed";
   if (isPrecheckStop(result.outcome)) return "escalated";
   if (result.outcome.escalation.action === "stop_write_off") return "write_off";
   if (result.simulatedResult === "recovered") return "recovered";
@@ -54,7 +57,7 @@ export function BatchRunPanel({ payments, onBatchComplete, onAuditLogAppend }: B
       const res = await fetch("/api/agent/batch", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ paymentIds: eligible.map((p) => p.id) }),
+        body: JSON.stringify({ payments: eligible }),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
@@ -130,9 +133,10 @@ export function BatchRunPanel({ payments, onBatchComplete, onAuditLogAppend }: B
               sub="of authorized-to-proceed cases"
             />
             <SummaryTile
-              label="Escalated / write-off"
-              value={`${response.summary.escalatedCount} / ${response.summary.writeOffCount}`}
-              sub="stopped by governance rules"
+              label="Escalated / write-off / failed"
+              value={`${response.summary.escalatedCount} / ${response.summary.writeOffCount} / ${response.summary.failedCount}`}
+              sub="stopped by rules, or pipeline error"
+              tone={response.summary.failedCount > 0 ? "destructive" : undefined}
             />
             <SummaryTile
               label="Run time"
@@ -218,7 +222,7 @@ function SummaryTile({
   label: string;
   value: string;
   sub: string;
-  tone?: "success";
+  tone?: "success" | "destructive";
 }) {
   return (
     <div className="neu-tile rounded-2xl p-4">
@@ -226,7 +230,9 @@ function SummaryTile({
       <p
         className={cn(
           "mt-1.5 font-figures text-xl font-semibold tabular-nums",
-          tone === "success" ? "text-success" : "text-foreground"
+          tone === "success" && "text-success",
+          tone === "destructive" && "text-destructive",
+          !tone && "text-foreground"
         )}
       >
         {value}
@@ -241,11 +247,13 @@ function DispositionBadge({ action }: { action: string }) {
     proceed: "text-primary",
     escalate_human_review: "text-violet-500",
     stop_write_off: "text-orange-500",
+    agent_error: "text-destructive",
   };
   const label: Record<string, string> = {
     proceed: "Proceed",
     escalate_human_review: "Escalated",
     stop_write_off: "Write-off",
+    agent_error: "Error",
   };
   return <span className={cn("text-xs font-medium", map[action])}>{label[action] ?? action}</span>;
 }

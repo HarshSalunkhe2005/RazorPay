@@ -156,7 +156,3 @@ export const failedPayments: FailedPayment[] = [
     preferredLanguage: "Hinglish",
   },
 ];
-
-export function getPaymentById(id: string): FailedPayment | undefined {
-  return failedPayments.find((p) => p.id === id);
-}

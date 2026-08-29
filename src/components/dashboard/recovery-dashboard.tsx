@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { Inbox, Zap, ScrollText, Workflow } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FailedPayment, PaymentStatus, AuditLogRecord } from "@/lib/types";
 import { computeStats } from "@/lib/stats";
@@ -11,10 +12,17 @@ import { BatchRunPanel } from "./batch-run-panel";
 import { ArchitectureView } from "./architecture-view";
 import { AuditLogView } from "./audit-log-view";
 import { PipelineFlow } from "./pipeline-flow";
+import { DatasetUpload } from "./dataset-upload";
+import { SectionHeader } from "./section-header";
+
+const PANEL_ANIMATION = "animate-in fade-in-0 slide-in-from-bottom-2 duration-300";
 
 export function RecoveryDashboard({ initialPayments }: { initialPayments: FailedPayment[] }) {
   const [payments, setPayments] = useState<FailedPayment[]>(initialPayments);
   const [auditLog, setAuditLog] = useState<AuditLogRecord[]>([]);
+  const [datasetLabel, setDatasetLabel] = useState(`${initialPayments.length} sample cases`);
+  const [datasetVersion, setDatasetVersion] = useState(0);
+  const [isSample, setIsSample] = useState(true);
   const stats = useMemo(() => computeStats(payments), [payments]);
 
   // Loaded client-side only, after mount, so the server-rendered HTML (always empty)
@@ -49,11 +57,32 @@ export function RecoveryDashboard({ initialPayments }: { initialPayments: Failed
     });
   }
 
+  function handleDatasetReplace(next: FailedPayment[], sourceLabel: string) {
+    setPayments(next);
+    setDatasetLabel(`${next.length} case${next.length === 1 ? "" : "s"} from ${sourceLabel}`);
+    setIsSample(false);
+    setDatasetVersion((v) => v + 1);
+  }
+
+  function handleDatasetReset() {
+    setPayments(initialPayments);
+    setDatasetLabel(`${initialPayments.length} sample cases`);
+    setIsSample(true);
+    setDatasetVersion((v) => v + 1);
+  }
+
   return (
     <div className="space-y-6">
       <StatCards stats={stats} />
 
       <PipelineFlow />
+
+      <DatasetUpload
+        onReplace={handleDatasetReplace}
+        onReset={handleDatasetReset}
+        isSample={isSample}
+        currentLabel={datasetLabel}
+      />
 
       <Tabs defaultValue="queue">
         <TabsList>
@@ -65,27 +94,53 @@ export function RecoveryDashboard({ initialPayments }: { initialPayments: Failed
           <TabsTrigger value="architecture">Architecture</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="queue" className="mt-4">
+        <TabsContent value="queue" className={`mt-5 ${PANEL_ANIMATION}`}>
+          <SectionHeader
+            icon={Inbox}
+            title="Recovery queue"
+            description="Every failed payment, searchable and filterable. Run the agent per case, or work through them one at a time."
+            accent="primary"
+          />
           <PaymentsTable
+            key={datasetVersion}
             payments={payments}
             onStatusChange={handleStatusChange}
             onAuditLogAppend={appendAuditRecords}
           />
         </TabsContent>
 
-        <TabsContent value="batch" className="mt-4">
+        <TabsContent value="batch" className={`mt-5 ${PANEL_ANIMATION}`}>
+          <SectionHeader
+            icon={Zap}
+            title="Batch run"
+            description="Process every open case through the same governed pipeline at once, bounded concurrency, aggregate metrics."
+            accent="accent"
+          />
           <BatchRunPanel
+            key={datasetVersion}
             payments={payments}
             onBatchComplete={handleBatchComplete}
             onAuditLogAppend={appendAuditRecords}
           />
         </TabsContent>
 
-        <TabsContent value="audit" className="mt-4">
+        <TabsContent value="audit" className={`mt-5 ${PANEL_ANIMATION}`}>
+          <SectionHeader
+            icon={ScrollText}
+            title="Audit log"
+            description="Every governed decision, single-case or batch, persisted across reloads — the record of truth, not the dialog you happened to leave open."
+            accent="success"
+          />
           <AuditLogView records={auditLog} onClear={handleClearAuditLog} />
         </TabsContent>
 
-        <TabsContent value="architecture" className="mt-4">
+        <TabsContent value="architecture" className={`mt-5 ${PANEL_ANIMATION}`}>
+          <SectionHeader
+            icon={Workflow}
+            title="Architecture"
+            description="Why this is a governed pipeline instead of a single prompt, and what's still ahead."
+            accent="neutral"
+          />
           <ArchitectureView />
         </TabsContent>
       </Tabs>
