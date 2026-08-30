@@ -116,10 +116,20 @@ Next.js API routes, deliberately, so there's nothing extra to keep alive for a l
   full payment objects now, not ids to look up server-side.
 - **Tabs stay tabs, not routes.** Explicitly discussed with the user whether "doesn't feel
   like a SPA" meant real per-section URLs — it didn't; the ask was a richer, more
-  distinct-feeling single page (see `SectionHeader`, entrance transitions), not a bigger
-  routing rewrite. Worth remembering if this comes up again: don't infer "convert to
-  multi-page" from "doesn't feel like an SPA" without asking, since the two aren't the
-  same complaint.
+  distinct-feeling single page (see `SectionHeader`), not a bigger routing rewrite. Worth
+  remembering if this comes up again: don't infer "convert to multi-page" from "doesn't
+  feel like an SPA" without asking, since the two aren't the same complaint.
+- **`Tabs` is explicitly controlled, not left to the library's own panel-hiding.** See
+  §5.16 — `@base-ui/react/tabs`'s built-in hidden-panel mechanism depends on detecting a
+  CSS transition/animation completing, which doesn't fire reliably without one defined
+  (and broke outright with a one-shot entrance animation). `RecoveryDashboard` now owns
+  `activeTab` state directly and gates each `TabsContent`'s children on it, rather than
+  trusting the library to hide inactive panels correctly.
+- **Caption/description text earns its place or gets cut, not shortened-but-kept.** See
+  §5.15 — the instinct when copy feels like clutter is to trim it; the actual fix was
+  asking whether each piece said anything the surrounding UI didn't already show, and
+  deleting the ones that didn't (the pipeline rationale paragraph, most `SectionHeader`
+  descriptions) rather than keeping a smaller version of restated-the-obvious text.
 
 ---
 
@@ -229,6 +239,40 @@ Chronological, most useful for "why does the code look like this."
     Caught by actually clicking through the feature in the browser after building it, not
     just typechecking it - `isSample` is now its own state, set explicitly by whichever
     handler (`handleDatasetReplace` vs `handleDatasetReset`) actually ran.
+15. **User feedback: the app "feels too AI" / "something's missing."** Investigated
+    concretely rather than reassuring: found (a) caption text that explained the app's own
+    architecture rationale to end users instead of just being a product (cut - the
+    pipeline diagram's node labels already said enough; section-header descriptions that
+    only restated visible UI were dropped, not just shortened), (b) dataset upload was a
+    single-line text link, not a real feature surface (rebuilt as an actual drag-and-drop
+    drop-zone card), and (c) `recharts` was installed but never imported anywhere in the
+    codebase - a real, checkable gap given the buildathon brief explicitly wants "money
+    recovered measured across batches, not a single demo click," and the app had no chart
+    of anything, anywhere. Added `AuditTrendChart` (stacked bar, decisions-by-disposition
+    over time), built from the audit log's already-persisted history rather than a new
+    tracking mechanism.
+16. **A real, load-bearing tab-switching bug**, found only because building the trend
+    chart required actually clicking into the Audit Log tab and reloading repeatedly.
+    `TabsContent` panels weren't hiding when inactive - the underlying
+    `@base-ui/react/tabs` `Tabs.Panel` clears its native `hidden` attribute only after
+    detecting a CSS transition/animation complete on that element, and with none defined
+    (or with a one-shot `animate-in` entrance class that has no matching exit animation,
+    which is what this session had added earlier for polish - see §4) that completion
+    never fires, so a previously-active panel's content stays visibly stuck under the new
+    one, sometimes at `opacity: 0` and sometimes fully opaque depending on timing. This
+    had almost certainly been live and broken since the panel-promotion work earlier this
+    session - undetected because the original verification only checked *text content*
+    per tab (`get_page_text`), which doesn't reflect `opacity`/`hidden` state at all, so a
+    tab switch that silently failed to visually update still "passed" a text-based check.
+    Fixed by not trusting the library's built-in hidden-panel mechanism at all: `Tabs` is
+    now explicitly controlled (`value`/`onValueChange` state in `RecoveryDashboard`), and
+    each `TabsContent`'s real children are gated on `activeTab === "<value>"` directly, so
+    an inactive panel is guaranteed empty regardless of what the library's own transition
+    logic is doing. Lesson: verifying interactive UI state (tab switches, toggles,
+    modals) by reading text content alone is not sufficient - check the actual rendered
+    visibility (computed `opacity`/`display`/`hidden`) when a bug report or gut feeling
+    says something looks wrong, don't stop at "the text is technically present somewhere
+    in the DOM."
 
 ---
 
@@ -279,13 +323,16 @@ get to it:
   never silently drops or 502s the whole batch (see §4, §5.11)
 - ✅ Basic per-IP rate limiting on both Gemini-calling routes (see §4)
 - ✅ Themed 404 / error boundaries (`src/app/not-found.tsx`, `error.tsx`)
-- ✅ Dataset upload: CSV or JSON, replaces the working dataset end-to-end (both API
-  routes now take full payment objects, not a server-side id lookup — see §5.13),
-  partial-success row errors surfaced via toast, "reset to sample" always available
-- ✅ Each tab panel has its own `SectionHeader` (icon, accent color, one-line purpose) and
-  a fade/slide entrance transition, so the single-page tab layout reads as distinct
-  product surfaces rather than one interchangeable pane — deliberately kept as tabs, not
-  routed pages, per explicit user direction
+- ✅ Dataset upload: CSV or JSON, real drag-and-drop drop-zone (not just a link), replaces
+  the working dataset end-to-end (both API routes take full payment objects, not a
+  server-side id lookup — see §5.13), partial-success row errors surfaced via toast,
+  "reset to sample" always available
+- ✅ Each tab panel has its own `SectionHeader` (icon, accent color, description only
+  where it adds real information) — deliberately kept as tabs, not routed pages, per
+  explicit user direction (see §4)
+- ✅ `AuditTrendChart`: decisions-by-disposition over time, stacked bar (recharts),
+  built from the audit log's persisted history — the buildathon's "measured across
+  batches" requirement made visual (see §5.15)
 - ⏳ Trained recoverability model (§7)
 - ⏳ Real Razorpay test-mode retry-link generation (currently a constructed mock URL)
 - ⏳ 5-minute pitch video

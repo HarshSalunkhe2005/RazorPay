@@ -11,16 +11,16 @@ const ACCENT_STYLES = {
 interface SectionHeaderProps {
   icon: LucideIcon;
   title: string;
-  description: string;
+  description?: string;
   accent?: keyof typeof ACCENT_STYLES;
 }
 
-/** Small icon + title + one-liner at the top of each tab panel, so each section reads as
- * a distinct surface with its own identity rather than an interchangeable pane behind a
- * generic tab strip. */
+/** Small icon + title (+ optional one-liner, only when it adds information the section
+ * itself doesn't already show) at the top of each tab panel, so each section reads as a
+ * distinct surface rather than an interchangeable pane behind a generic tab strip. */
 export function SectionHeader({ icon: Icon, title, description, accent = "neutral" }: SectionHeaderProps) {
   return (
-    <div className="mb-5 flex items-start gap-3">
+    <div className="mb-5 flex items-center gap-3">
       <div
         className={cn(
           "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl",
@@ -31,7 +31,7 @@ export function SectionHeader({ icon: Icon, title, description, accent = "neutra
       </div>
       <div>
         <h2 className="text-sm font-semibold text-foreground">{title}</h2>
-        <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>
+        {description && <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>}
       </div>
     </div>
   );

@@ -13,6 +13,7 @@ import {
 import { AuditLogRecord, EscalationAction } from "@/lib/types";
 import { formatINR } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { AuditTrendChart } from "./audit-trend-chart";
 
 const ACTION_META: Record<EscalationAction, { label: string; className: string }> = {
   proceed: { label: "Proceeded", className: "text-primary" },
@@ -125,6 +126,8 @@ export function AuditLogView({ records, onClear }: AuditLogViewProps) {
           <BreakdownTile label="Failed" value={breakdown.agent_error} className="text-destructive" />
         </div>
       )}
+
+      <AuditTrendChart records={records} />
 
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-1 flex-col gap-2 sm:flex-row">

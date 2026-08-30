@@ -15,11 +15,15 @@ import { PipelineFlow } from "./pipeline-flow";
 import { DatasetUpload } from "./dataset-upload";
 import { SectionHeader } from "./section-header";
 
-const PANEL_ANIMATION = "animate-in fade-in-0 slide-in-from-bottom-2 duration-300";
-
 export function RecoveryDashboard({ initialPayments }: { initialPayments: FailedPayment[] }) {
   const [payments, setPayments] = useState<FailedPayment[]>(initialPayments);
   const [auditLog, setAuditLog] = useState<AuditLogRecord[]>([]);
+  // Controlled explicitly (rather than relying on TabsContent's own hidden-panel
+  // machinery) - the underlying base-ui Tabs.Panel only clears its `hidden` attribute
+  // after detecting a CSS transition/animation completing, and with none defined it
+  // never completes, leaving the previous panel's content visibly stuck on top of the
+  // new one. Gating each panel's children on this state sidesteps that entirely.
+  const [activeTab, setActiveTab] = useState("queue");
   const [datasetLabel, setDatasetLabel] = useState(`${initialPayments.length} sample cases`);
   const [datasetVersion, setDatasetVersion] = useState(0);
   const [isSample, setIsSample] = useState(true);
@@ -84,7 +88,7 @@ export function RecoveryDashboard({ initialPayments }: { initialPayments: Failed
         currentLabel={datasetLabel}
       />
 
-      <Tabs defaultValue="queue">
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as string)}>
         <TabsList>
           <TabsTrigger value="queue">Recovery queue</TabsTrigger>
           <TabsTrigger value="batch">Batch run</TabsTrigger>
@@ -94,54 +98,60 @@ export function RecoveryDashboard({ initialPayments }: { initialPayments: Failed
           <TabsTrigger value="architecture">Architecture</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="queue" className={`mt-5 ${PANEL_ANIMATION}`}>
-          <SectionHeader
-            icon={Inbox}
-            title="Recovery queue"
-            description="Every failed payment, searchable and filterable. Run the agent per case, or work through them one at a time."
-            accent="primary"
-          />
-          <PaymentsTable
-            key={datasetVersion}
-            payments={payments}
-            onStatusChange={handleStatusChange}
-            onAuditLogAppend={appendAuditRecords}
-          />
+        <TabsContent value="queue" className="mt-5">
+          {activeTab === "queue" && (
+            <>
+              <SectionHeader icon={Inbox} title="Recovery queue" accent="primary" />
+              <PaymentsTable
+                key={datasetVersion}
+                payments={payments}
+                onStatusChange={handleStatusChange}
+                onAuditLogAppend={appendAuditRecords}
+              />
+            </>
+          )}
         </TabsContent>
 
-        <TabsContent value="batch" className={`mt-5 ${PANEL_ANIMATION}`}>
-          <SectionHeader
-            icon={Zap}
-            title="Batch run"
-            description="Process every open case through the same governed pipeline at once, bounded concurrency, aggregate metrics."
-            accent="accent"
-          />
-          <BatchRunPanel
-            key={datasetVersion}
-            payments={payments}
-            onBatchComplete={handleBatchComplete}
-            onAuditLogAppend={appendAuditRecords}
-          />
+        <TabsContent value="batch" className="mt-5">
+          {activeTab === "batch" && (
+            <>
+              <SectionHeader icon={Zap} title="Batch run" description="Every open case, through the same pipeline, at once." accent="accent" />
+              <BatchRunPanel
+                key={datasetVersion}
+                payments={payments}
+                onBatchComplete={handleBatchComplete}
+                onAuditLogAppend={appendAuditRecords}
+              />
+            </>
+          )}
         </TabsContent>
 
-        <TabsContent value="audit" className={`mt-5 ${PANEL_ANIMATION}`}>
-          <SectionHeader
-            icon={ScrollText}
-            title="Audit log"
-            description="Every governed decision, single-case or batch, persisted across reloads — the record of truth, not the dialog you happened to leave open."
-            accent="success"
-          />
-          <AuditLogView records={auditLog} onClear={handleClearAuditLog} />
+        <TabsContent value="audit" className="mt-5">
+          {activeTab === "audit" && (
+            <>
+              <SectionHeader
+                icon={ScrollText}
+                title="Audit log"
+                description="Every governed decision, single-case or batch, persisted across reloads — the record of truth, not the dialog you happened to leave open."
+                accent="success"
+              />
+              <AuditLogView records={auditLog} onClear={handleClearAuditLog} />
+            </>
+          )}
         </TabsContent>
 
-        <TabsContent value="architecture" className={`mt-5 ${PANEL_ANIMATION}`}>
-          <SectionHeader
-            icon={Workflow}
-            title="Architecture"
-            description="Why this is a governed pipeline instead of a single prompt, and what's still ahead."
-            accent="neutral"
-          />
-          <ArchitectureView />
+        <TabsContent value="architecture" className="mt-5">
+          {activeTab === "architecture" && (
+            <>
+              <SectionHeader
+                icon={Workflow}
+                title="Architecture"
+                description="Why this is a governed pipeline instead of a single prompt, and what's still ahead."
+                accent="neutral"
+              />
+              <ArchitectureView />
+            </>
+          )}
         </TabsContent>
       </Tabs>
     </div>

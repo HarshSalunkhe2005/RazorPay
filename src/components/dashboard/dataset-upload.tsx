@@ -2,10 +2,11 @@
 
 import { useRef, useState } from "react";
 import { toast } from "sonner";
-import { Upload, RotateCcw, Download } from "lucide-react";
+import { UploadCloud, RotateCcw, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { FailedPayment } from "@/lib/types";
 import { parseDatasetFile, SAMPLE_CSV } from "@/lib/dataset-import";
+import { cn } from "@/lib/utils";
 
 interface DatasetUploadProps {
   onReplace: (payments: FailedPayment[], sourceLabel: string) => void;
@@ -17,6 +18,7 @@ interface DatasetUploadProps {
 export function DatasetUpload({ onReplace, onReset, isSample, currentLabel }: DatasetUploadProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
+  const [dragActive, setDragActive] = useState(false);
 
   async function handleFile(file: File) {
     setBusy(true);
@@ -62,7 +64,23 @@ export function DatasetUpload({ onReplace, onReset, isSample, currentLabel }: Da
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-3">
+    <div
+      className={cn(
+        "neu-tile relative overflow-hidden rounded-2xl border-2 border-dashed p-6 transition-colors",
+        dragActive ? "border-primary/60 bg-primary/5" : "border-border/50"
+      )}
+      onDragOver={(e) => {
+        e.preventDefault();
+        setDragActive(true);
+      }}
+      onDragLeave={() => setDragActive(false)}
+      onDrop={(e) => {
+        e.preventDefault();
+        setDragActive(false);
+        const file = e.dataTransfer.files?.[0];
+        if (file) handleFile(file);
+      }}
+    >
       <input
         ref={inputRef}
         type="file"
@@ -73,22 +91,40 @@ export function DatasetUpload({ onReplace, onReset, isSample, currentLabel }: Da
           if (file) handleFile(file);
         }}
       />
-      <Button variant="outline" size="sm" onClick={() => inputRef.current?.click()} disabled={busy}>
-        <Upload /> {busy ? "Loading…" : "Upload dataset"}
-      </Button>
-      {!isSample && (
-        <Button variant="ghost" size="sm" onClick={onReset} className="text-muted-foreground">
-          <RotateCcw /> Reset to sample
-        </Button>
-      )}
+
+      <div className="flex flex-col items-center gap-3 text-center sm:flex-row sm:items-center sm:text-left">
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/15 text-primary">
+          <UploadCloud className="size-5" />
+        </div>
+
+        <div className="flex-1">
+          <p className="text-sm font-medium text-foreground">
+            {busy ? "Reading file…" : "Drop a CSV or JSON file to run your own cases"}
+          </p>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Same governed pipeline, your data. Currently: {currentLabel}
+          </p>
+        </div>
+
+        <div className="flex shrink-0 flex-wrap items-center justify-center gap-2">
+          <Button size="sm" onClick={() => inputRef.current?.click()} disabled={busy}>
+            Browse file
+          </Button>
+          {!isSample && (
+            <Button variant="outline" size="sm" onClick={onReset} className="text-muted-foreground">
+              <RotateCcw /> Reset
+            </Button>
+          )}
+        </div>
+      </div>
+
       <button
         type="button"
         onClick={downloadSample}
-        className="inline-flex items-center gap-1 text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
+        className="mt-4 inline-flex items-center gap-1 text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
       >
-        <Download className="size-3" /> Sample CSV format
+        <Download className="size-3" /> Download sample CSV format
       </button>
-      <span className="text-xs text-muted-foreground/70">· {currentLabel}</span>
     </div>
   );
 }

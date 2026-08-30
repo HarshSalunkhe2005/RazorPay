@@ -66,12 +66,6 @@ export function PipelineFlow() {
         <Arrow label="authorized" />
         <FlowNode title="Execute + audit" sub="Retry link, outreach, logged trail" />
       </div>
-      <p className="mt-4 text-xs text-muted-foreground">
-        Both governance checks sit outside the model on purpose — deterministic, testable
-        rules the LLM cannot reason its way around. A case that fails either check never
-        reaches (or acts on) the agent&rsquo;s recommendation, and the decision is written to
-        that case&rsquo;s audit trail either way.
-      </p>
     </div>
   );
 }
