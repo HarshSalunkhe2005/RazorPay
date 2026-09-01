@@ -245,7 +245,7 @@ function SummaryTile({
 function DispositionBadge({ action }: { action: string }) {
   const map: Record<string, string> = {
     proceed: "text-primary",
-    escalate_human_review: "text-violet-500",
+    escalate_human_review: "text-escalated",
     stop_write_off: "text-orange-500",
     agent_error: "text-destructive",
   };

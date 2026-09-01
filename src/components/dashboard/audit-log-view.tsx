@@ -17,7 +17,7 @@ import { AuditTrendChart } from "./audit-trend-chart";
 
 const ACTION_META: Record<EscalationAction, { label: string; className: string }> = {
   proceed: { label: "Proceeded", className: "text-primary" },
-  escalate_human_review: { label: "Escalated", className: "text-violet-500" },
+  escalate_human_review: { label: "Escalated", className: "text-escalated" },
   stop_write_off: { label: "Write-off", className: "text-orange-500" },
   agent_error: { label: "Failed", className: "text-destructive" },
 };
@@ -121,7 +121,7 @@ export function AuditLogView({ records, onClear }: AuditLogViewProps) {
       {records.length > 0 && (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <BreakdownTile label="Proceeded" value={breakdown.proceed} className="text-primary" />
-          <BreakdownTile label="Escalated" value={breakdown.escalate_human_review} className="text-violet-500" />
+          <BreakdownTile label="Escalated" value={breakdown.escalate_human_review} className="text-escalated" />
           <BreakdownTile label="Write-off" value={breakdown.stop_write_off} className="text-orange-500" />
           <BreakdownTile label="Failed" value={breakdown.agent_error} className="text-destructive" />
         </div>

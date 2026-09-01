@@ -41,7 +41,7 @@ export function StatCards({ stats }: { stats: DashboardStats }) {
       <div className="neu-tile glow-ring relative overflow-hidden rounded-2xl p-6 sm:p-8">
         <div
           aria-hidden
-          className="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-[radial-gradient(circle,oklch(0.63_0.19_258_/_22%),transparent_70%)]"
+          className="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-[radial-gradient(circle,color-mix(in_oklch,var(--primary)_22%,transparent),transparent_70%)]"
         />
         <div className="flex items-start justify-between gap-4">
           <div>

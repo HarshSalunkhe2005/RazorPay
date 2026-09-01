@@ -20,9 +20,9 @@ export function RadialGauge({
   size = 96,
   strokeWidth = 8,
   className,
-  trackColor = "oklch(1 0 0 / 8%)",
-  gradientFrom = "oklch(0.72 0.16 258)",
-  gradientTo = "oklch(0.68 0.18 295)",
+  trackColor = "color-mix(in oklch, var(--foreground) 8%, transparent)",
+  gradientFrom = "var(--primary)",
+  gradientTo = "var(--accent)",
   children,
 }: RadialGaugeProps) {
   const gradientId = `gauge-grad-${useId()}`;

@@ -32,7 +32,7 @@ function scoreGaugeColors(score: number) {
   if (score >= 70) {
     return { gradientFrom: "oklch(0.78 0.15 165)", gradientTo: "oklch(0.72 0.17 165)" };
   }
-  return { gradientFrom: "oklch(0.72 0.16 258)", gradientTo: "oklch(0.68 0.18 295)" };
+  return { gradientFrom: "var(--primary)", gradientTo: "var(--accent)" };
 }
 
 const STAGE_LABELS: Record<AgentStep["stage"], string> = {
@@ -103,7 +103,7 @@ const ESCALATION_BANNER: Record<
 > = {
   escalate_human_review: {
     label: "Escalated to human review — stopping rule fired before the agent ran",
-    className: "border-violet-500/30 bg-violet-500/10 text-violet-600 dark:text-violet-400",
+    className: "border-escalated/30 bg-escalated/10 text-escalated",
   },
   stop_write_off: {
     label: "Plan drafted but not executed — below the write-off threshold",

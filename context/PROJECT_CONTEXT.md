@@ -75,11 +75,14 @@ Next.js API routes, deliberately, so there's nothing extra to keep alive for a l
   Architecture tab. Chose honesty over faking a bigger number — a judge asking "how do you
   know this was recovered" gets a straight answer.
 - **Design system: dark fintech, Razorpay-leaning, glass + neumorphism, not default
-  shadcn.** User explicitly asked the frontend not read as AI-generated. Palette (electric
-  blue `#3395FF`-ish + violet gradient on charcoal-navy), glass panels reserved for
-  overlays only, neumorphic dual-shadow stat tiles, tabular-nums money figures. See
-  `src/app/globals.css` utilities: `.bg-mesh`, `.glass-panel`, `.neu-tile`,
-  `.text-gradient-brand`, `.glow-ring`, `.font-figures`.
+  shadcn.** User explicitly asked the frontend not read as AI-generated. Original palette
+  (electric blue `#3395FF`-ish + violet gradient on charcoal-navy) was chosen for exactly
+  that reason — see §5.17 for why it was replaced with amber-gold + deep teal instead
+  (same glass/neumorphism/tabular-nums structure, different hue). Utilities in
+  `src/app/globals.css`: `.bg-mesh`, `.glass-panel`, `.neu-tile`, `.text-gradient-brand`,
+  `.glow-ring`, `.font-figures` — all now `var()`/`color-mix()`-driven off the CSS custom
+  properties rather than hardcoded oklch literals, so they self-adapt across the light and
+  dark themes added in §5.17 instead of needing separate overrides per theme.
 - **Single LLM call per case, not 4 separate calls.** The agent produces all 4
   reasoning stages (classify/strategize/draft/action) in one structured-output call, then
   the UI reveals them staggered client-side. Cheaper and faster than 4 round-trips; still
@@ -114,11 +117,15 @@ Next.js API routes, deliberately, so there's nothing extra to keep alive for a l
   and from that point on it *is* the working dataset the rest of the app already operates
   on. This only actually works end-to-end because of §5.13's fix: the API routes take
   full payment objects now, not ids to look up server-side.
-- **Tabs stay tabs, not routes.** Explicitly discussed with the user whether "doesn't feel
-  like a SPA" meant real per-section URLs — it didn't; the ask was a richer, more
-  distinct-feeling single page (see `SectionHeader`), not a bigger routing rewrite. Worth
-  remembering if this comes up again: don't infer "convert to multi-page" from "doesn't
-  feel like an SPA" without asking, since the two aren't the same complaint.
+- **Tabs stay tabs, not routes — reversed in §5.17.** This was explicitly discussed once
+  before and settled against a routing rewrite (see the original reasoning kept below).
+  Revisited and deliberately overturned in §5.17 once a competing submission gave a
+  concrete comparison point, not from "doesn't feel like an SPA" recurring in the abstract
+  — the two situations aren't the same complaint, and the earlier caution about not
+  inferring one from the other still holds; this was a fresh, specific reason to reopen it.
+  Original reasoning: discussed with the user whether "doesn't feel like a SPA" meant real
+  per-section URLs — it didn't at the time; the ask was a richer, more distinct-feeling
+  single page (see `SectionHeader`), not a bigger routing rewrite.
 - **`Tabs` is explicitly controlled, not left to the library's own panel-hiding.** See
   §5.16 — `@base-ui/react/tabs`'s built-in hidden-panel mechanism depends on detecting a
   CSS transition/animation completing, which doesn't fire reliably without one defined
@@ -274,6 +281,57 @@ Chronological, most useful for "why does the code look like this."
     says something looks wrong, don't stop at "the text is technically present somewhere
     in the DOM."
 
+17. **Palette + single-page structure reconsidered after seeing a competing submission.**
+    User compared this app against another Track 03 submission ("RevShield AI" —
+    react/vite, LinkedIn post + live deploy) and judged it looked more polished: a
+    persistent multi-page-feeling nav vs. our single scrolling page with an inline tab
+    switcher, and a more distinct color story vs. our electric-blue + violet, which —
+    despite being deliberately chosen in §4 specifically *to not* look AI-generated — reads
+    as exactly that, since blue/violet-on-dark is what most AI-assisted UI converges on
+    regardless of intent. Two changes made, both confirmed with the user before starting
+    (real routes was a deliberate reversal of §4's "tabs stay tabs" decision, not a default
+    inference from vague dissatisfaction — see that entry):
+    - **Real routes, persistent nav shell.** `/`, `/batch`, `/audit`, `/architecture`
+      replace the single-page `Tabs` component. State (`payments`, `auditLog`, dataset
+      upload state) moved out of the deleted `recovery-dashboard.tsx` into
+      `src/lib/recovery-state.tsx` (`RecoveryStateProvider` + `useRecoveryState()`),
+      mounted in `src/app/(dashboard)/layout.tsx` — a layout, not any individual page,
+      specifically so it survives client-side navigation between the 4 routes instead of
+      resetting on every nav click. `src/components/shell/app-nav.tsx` is the sticky top
+      bar (logo/wordmark/status pill + `next/link` nav items with live audit-count badge +
+      theme toggle), also mounted from that layout. Verified concretely, not assumed:
+      changed a payment's status via "Run agent," navigated `/` → `/batch` → `/`, confirmed
+      the status change survived — and separately confirmed a real full-page reload (typed
+      URL / hard navigate) *does* reset in-memory state, same as it always would have, to
+      make sure the persistence claim wasn't accidentally validated by a false positive.
+      The old `@base-ui/react/tabs` "fully controlled Tabs" workaround from §5.16 doesn't
+      carry over and wasn't ported — that bug class (a panel not hiding because the
+      library's own animation-completion-gated `hidden` attribute never fired) doesn't
+      exist for real routes, where only one page component is ever mounted per URL.
+    - **Amber-gold (primary) + deep-teal (accent) palette, replacing blue + violet**, on
+      the same warm-charcoal dark base, plus a genuinely working light mode (`next-themes`
+      was already an installed dependency but completely unwired — no `ThemeProvider`
+      existed anywhere, `<html>` was permanently hardcoded to `dark`, `useTheme()` was only
+      ever called inside shadcn's own `Toaster`). Added a real light `:root` palette (warm
+      cream base, not inverted gray — light mode had never been designed, only defaulted
+      to generic shadcn gray) and a `ThemeProvider`/toggle in `src/app/layout.tsx` +
+      `src/components/shell/theme-toggle.tsx` (`attribute="class"`, `defaultTheme="dark"`,
+      `enableSystem={false}` — deliberate, so a live demo doesn't silently follow the
+      judge's/presenter's OS theme). Added a dedicated `--escalated` (violet) semantic
+      token alongside the existing `--success` pattern, consolidating four places that had
+      each independently hardcoded `violet-500` for the same "escalated" status
+      (`status-badge.tsx`, `audit-log-view.tsx`, `batch-run-panel.tsx`, the chart's
+      `--chart-2`) so the color is now defined once. Caught and fixed two light-mode
+      correctness bugs during this pass, not just a hue swap: `.neu-tile`/`.glass-panel`
+      and `RadialGauge`'s default `trackColor` were hardcoded to *dark-mode-specific*
+      literals, so left alone they'd have rendered as a near-invisible or near-black panel
+      on the new cream light background — fixed by making them `color-mix()`/`var()`-driven
+      off `--card`/`--foreground` so they self-adapt instead of needing separate per-theme
+      overrides. Verified in-browser in both themes on all 4 routes, plus a hard refresh on
+      a non-root route to confirm no flash-of-wrong-theme on first paint (the actual
+      failure mode the `suppressHydrationWarning` placement + blocking inline theme script
+      are there to prevent).
+
 ---
 
 ## 6. Prior-art reviewed: `HarshSalunkhe2005/Retail-Agentic-AI`
@@ -318,7 +376,8 @@ get to it:
   permanently above the tabs (see §4)
 - ✅ Composite recovery-rate gauge (hero tile) + recoverability-score gauge (agent trace
   dialog), `RadialGauge` — see §4
-- ✅ Dark fintech design system (see §4)
+- ✅ Amber-gold + deep-teal fintech design system, dark (default) and light, real toggle
+  (see §5.17)
 - ✅ Batch run resilient to per-case pipeline failures — documented via `agent_error`,
   never silently drops or 502s the whole batch (see §4, §5.11)
 - ✅ Basic per-IP rate limiting on both Gemini-calling routes (see §4)
@@ -327,17 +386,18 @@ get to it:
   the working dataset end-to-end (both API routes take full payment objects, not a
   server-side id lookup — see §5.13), partial-success row errors surfaced via toast,
   "reset to sample" always available
-- ✅ Each tab panel has its own `SectionHeader` (icon, accent color, description only
-  where it adds real information) — deliberately kept as tabs, not routed pages, per
-  explicit user direction (see §4)
+- ✅ Real routes (`/`, `/batch`, `/audit`, `/architecture`) with a persistent sticky nav
+  shell, replacing the single-page tab switcher — see §5.17. Each route keeps its own
+  `SectionHeader` (icon, accent color, description only where it adds real information)
 - ✅ `AuditTrendChart`: decisions-by-disposition over time, stacked bar (recharts),
   built from the audit log's persisted history — the buildathon's "measured across
   batches" requirement made visual (see §5.15)
 - ⏳ Trained recoverability model (§7)
 - ⏳ Real Razorpay test-mode retry-link generation (currently a constructed mock URL)
 - ⏳ 5-minute pitch video
-- ⏳ Deployment (Vercel) — CLI device-login only works from the user's own terminal (see
-  §5.12); handed off to the user to run `vercel deploy` themselves and report back the URL
+- ✅ Deployment (Vercel) — live at `razor-pay-five-bice.vercel.app`. CLI device-login only
+  works from the user's own terminal (see §5.12), so the user ran `vercel deploy`
+  themselves rather than through this session.
 
 ## 9. Environment / running locally
 

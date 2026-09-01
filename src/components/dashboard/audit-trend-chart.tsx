@@ -44,11 +44,11 @@ export function AuditTrendChart({ records }: { records: AuditLogRecord[] }) {
       </p>
       <ResponsiveContainer width="100%" height={220}>
         <BarChart data={data} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="oklch(1 0 0 / 8%)" vertical={false} />
-          <XAxis dataKey="day" tick={{ fill: "oklch(0.66 0.02 265)", fontSize: 11 }} axisLine={false} tickLine={false} />
-          <YAxis allowDecimals={false} tick={{ fill: "oklch(0.66 0.02 265)", fontSize: 11 }} axisLine={false} tickLine={false} width={28} />
+          <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+          <XAxis dataKey="day" tick={{ fill: "var(--muted-foreground)", fontSize: 11 }} axisLine={false} tickLine={false} />
+          <YAxis allowDecimals={false} tick={{ fill: "var(--muted-foreground)", fontSize: 11 }} axisLine={false} tickLine={false} width={28} />
           <Tooltip
-            cursor={{ fill: "oklch(1 0 0 / 4%)" }}
+            cursor={{ fill: "color-mix(in oklch, var(--foreground) 4%, transparent)" }}
             contentStyle={{
               background: "var(--popover)",
               border: "1px solid var(--border)",

@@ -13,7 +13,7 @@ const STATUS_CONFIG: Record<PaymentStatus, { label: string; className: string }>
   },
   contacted: {
     label: "Contacted",
-    className: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20",
+    className: "bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-500/20",
   },
   recovered: {
     label: "Recovered",
@@ -25,7 +25,7 @@ const STATUS_CONFIG: Record<PaymentStatus, { label: string; className: string }>
   },
   escalated: {
     label: "Escalated · human review",
-    className: "bg-violet-500/10 text-violet-600 dark:text-violet-400 border-violet-500/20",
+    className: "bg-escalated/10 text-escalated border-escalated/20",
   },
   write_off: {
     label: "Write-off",
