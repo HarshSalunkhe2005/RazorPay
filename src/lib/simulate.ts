@@ -1,3 +1,5 @@
+import { hashToUnit } from "./hash";
+
 /**
  * DEMO-ONLY simulation of a payment retry's real-world outcome.
  *
@@ -10,14 +12,6 @@
  * own recoverability score so a 90/100 case is much more likely to "recover" than a
  * 15/100 one - the simulation stays honest about what it represents.
  */
-function hashToUnit(id: string): number {
-  let h = 0;
-  for (let i = 0; i < id.length; i++) {
-    h = (h * 31 + id.charCodeAt(i)) >>> 0;
-  }
-  return (h % 10000) / 10000; // deterministic pseudo-random in [0, 1)
-}
-
 export function simulateOutcome(
   paymentId: string,
   recoverabilityScore: number

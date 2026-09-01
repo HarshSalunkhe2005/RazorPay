@@ -1,3 +1,5 @@
+import { MODEL_METRICS } from "@/lib/recoverability-model";
+
 export function ArchitectureView() {
   return (
     <div className="grid gap-4 sm:grid-cols-2">
@@ -22,13 +24,17 @@ export function ArchitectureView() {
         </p>
       </div>
       <div className="rounded-2xl border border-border/60 p-5">
-        <p className="text-sm font-medium text-foreground">What&rsquo;s next: a trained recoverability model</p>
+        <p className="text-sm font-medium text-foreground">A trained recoverability model, not an LLM guess</p>
         <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-          The recoverability score is currently the LLM&rsquo;s own judgment. The planned
-          next step swaps it for a small classifier trained on a synthetic labeled dataset
-          (failure type, tenure, payment history → recovered/not) with a held-out
-          precision/recall/AUC report, ported into the app for zero-latency inference — the
-          LLM stays for what it&rsquo;s actually good at: strategy and drafting.
+          The recoverability score is decided by a logistic regression classifier trained
+          on a synthetic labeled dataset (failure type, tenure, payment history, attempt
+          count → recovered/not — see <code className="font-figures">scripts/train-recoverability-model.mjs</code>),
+          held out and measured honestly: precision {(MODEL_METRICS.precision * 100).toFixed(0)}%,
+          recall {(MODEL_METRICS.recall * 100).toFixed(0)}%, AUC {MODEL_METRICS.auc.toFixed(2)} on
+          {" "}{MODEL_METRICS.testSize} held-out cases. It runs in-process (no second
+          service, zero added latency) and drives the write-off governance rule directly —
+          the LLM sees this score as reference context and stays for what it&rsquo;s
+          actually good at: strategy and drafting.
         </p>
       </div>
       <div className="rounded-2xl border border-border/60 p-5">

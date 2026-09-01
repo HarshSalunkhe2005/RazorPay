@@ -18,7 +18,7 @@ import {
   AuditEntry,
   isPrecheckStop,
 } from "@/lib/types";
-import { formatINR, channelLabel, incentiveLabel } from "@/lib/format";
+import { formatINR, formatDate, channelLabel, incentiveLabel } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { RadialGauge } from "./radial-gauge";
 import { WRITE_OFF_SCORE_THRESHOLD } from "@/lib/escalation";
@@ -241,6 +241,13 @@ function AgentResultView({ result }: { result: AgentResult }) {
         <div className={cn("rounded-lg border p-3 text-sm", banner.className)}>{banner.label}</div>
       )}
 
+      {result.retryScheduledFor && (
+        <div className="rounded-lg border border-accent/30 bg-accent/10 p-3 text-sm text-accent">
+          Bank gateway outage detected (simulated check) — contact deferred until{" "}
+          {formatDate(result.retryScheduledFor)}, not sent immediately.
+        </div>
+      )}
+
       <div className="space-y-3">
         {result.steps.map((step, i) => (
           <StepCard key={step.stage} step={step} index={i} />
@@ -254,14 +261,22 @@ function AgentResultView({ result }: { result: AgentResult }) {
         <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-foreground">
           {result.message}
         </p>
-        <a
-          href={result.retryLink}
-          target="_blank"
-          rel="noreferrer"
-          className="mt-3 inline-block break-all font-figures text-xs text-primary underline underline-offset-2"
-        >
-          {result.retryLink}
-        </a>
+        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5">
+          <a
+            href={result.retryLink}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-block break-all font-figures text-xs text-primary underline underline-offset-2"
+          >
+            {result.retryLink}
+          </a>
+          <a
+            href={result.upiIntentLink}
+            className="inline-flex items-center gap-1 text-xs font-medium text-accent underline underline-offset-2"
+          >
+            Pay via UPI (GPay / PhonePe)
+          </a>
+        </div>
       </div>
 
       <AuditLog trail={result.auditTrail} />

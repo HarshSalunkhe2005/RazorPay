@@ -71,6 +71,13 @@ export interface AgentResult {
   recommendedIncentive: Incentive;
   message: string;
   retryLink: string;
+  /** UPI deep link (upi://pay?...) for 1-tap payment via GPay/PhonePe/etc - a demo
+   * construction against a mock VPA, same honesty framing as retryLink. */
+  upiIntentLink: string;
+  /** Set when a deterministic bank-gateway-outage check (lib/bank-uptime.ts) defers this
+   * case's contact instead of recommending immediate outreach. Absent for the common
+   * case. */
+  retryScheduledFor?: string;
   steps: AgentStep[];
   escalation: EscalationDecision;
   auditTrail: AuditEntry[];

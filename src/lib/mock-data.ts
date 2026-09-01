@@ -155,4 +155,24 @@ export const failedPayments: FailedPayment[] = [
     customerTenureMonths: 1,
     preferredLanguage: "Hinglish",
   },
+  {
+    // id chosen (not sequential) so its deterministic bank-uptime hash actually falls
+    // into the "gateway down" bucket - see lib/bank-uptime.ts - so this scenario is
+    // demoable straight from the seeded dataset, not only via a lucky upload.
+    id: "pay_F470",
+    customerName: "Divya Nair",
+    customerEmail: "divya.nair@example.com",
+    customerPhone: "+91 92345 67891",
+    amount: 2199,
+    currency: "INR",
+    planName: "Pro Monthly",
+    failureReason: "issuer_unavailable",
+    failedAt: "2026-08-27T10:15:00Z",
+    attemptNumber: 1,
+    subscriptionId: "sub_A110",
+    status: "failed",
+    previousSuccessfulPayments: 5,
+    customerTenureMonths: 8,
+    preferredLanguage: "English",
+  },
 ];

@@ -7,6 +7,9 @@ import {
   auditEntry,
   MAX_AUTOMATED_ATTEMPTS,
 } from "./escalation";
+import { predictRecoverability } from "./recoverability";
+import { capIncentive } from "./incentive-guard";
+import { isBankGatewayLikelyDown, nextLikelyUptimeWindow } from "./bank-uptime";
 
 const MODEL = "gemini-3.6-flash";
 
@@ -27,7 +30,6 @@ const AgentStepSchema = z.object({
 });
 
 const AgentOutputSchema = z.object({
-  recoverabilityScore: z.number().min(0).max(100),
   rootCause: z.string(),
   recommendedChannel: z.enum(["email", "sms", "whatsapp", "voice_call"]),
   recommendedTiming: z.string(),
@@ -48,7 +50,6 @@ const AgentOutputSchema = z.object({
 const RESPONSE_JSON_SCHEMA = {
   type: "object",
   properties: {
-    recoverabilityScore: { type: "number" },
     rootCause: { type: "string" },
     recommendedChannel: { type: "string", enum: ["email", "sms", "whatsapp", "voice_call"] },
     recommendedTiming: { type: "string" },
@@ -74,7 +75,6 @@ const RESPONSE_JSON_SCHEMA = {
     },
   },
   required: [
-    "recoverabilityScore",
     "rootCause",
     "recommendedChannel",
     "recommendedTiming",
@@ -87,18 +87,22 @@ const RESPONSE_JSON_SCHEMA = {
 const SYSTEM_PROMPT = `You are the Recovery Agent for a payments platform, modeled on Razorpay's AI Buildathon "Revenue Recovery" track.
 
 Given one failed payment/subscription-renewal event, work through four explicit reasoning stages and return them all:
-1. "classify" - diagnose the true root cause behind the failure code (not just restate it), and estimate a recoverability score 0-100 based on failure type, customer tenure, and payment history.
-2. "strategize" - decide the best recovery channel (email / sms / whatsapp / voice_call), timing, and incentive (none / grace_period_3d / discount_10 / discount_20 / fee_waiver). Weigh cost of incentive against customer lifetime value signals (tenure, prior successful payments). Do not over-offer discounts to low-value or brand-new, unproven customers; do protect high-tenure loyal customers.
-3. "draft" - write the actual outbound recovery message in the customer's preferred language/tone (support Hinglish naturally, not just literal translation). Keep it short, warm, and action-oriented with a clear next step.
+1. "classify" - diagnose the true root cause behind the failure code (not just restate it). A trained classifier's recoverability estimate for this case is given to you as reference context below (not something you output) - use it as a starting point, and say in your reasoning whether the qualitative picture (failure type, tenure, payment history) agrees with it or would push the number higher/lower.
+2. "strategize" - decide the best recovery channel (email / sms / whatsapp / voice_call), timing, and incentive (none / grace_period_3d / discount_10 / discount_20 / fee_waiver). Weigh cost of incentive against customer lifetime value signals (tenure, prior successful payments). Do not over-offer discounts to low-value or brand-new, unproven customers; do protect high-tenure loyal customers. (A deterministic guardrail also caps this after you decide - see lib/incentive-guard.ts - so treat this as the real target, not a suggestion to push against.) If a bank-gateway-outage window is flagged in the context below, timing must reflect deferring contact until it clears, not immediate outreach.
+3. "draft" - write the actual outbound recovery message in the customer's preferred language/tone (support Hinglish naturally, not just literal translation). Keep it short, warm, and action-oriented with a clear next step. Match the tone to the channel: sms/whatsapp should be short and punchy (a sentence or two, not a paragraph); voice_call should read as a short spoken call script ("Hi, this is..."), not written prose; email can be slightly more formal, with a clear opening line that works as a subject-line-style hook.
 4. "action" - summarize the concrete automated action taken (e.g. "Generated fresh payment retry link, scheduled WhatsApp send in 2 hours").
 
-Each step's "reasoning" field should read like real analyst thinking (2-4 sentences), and "output" must be a flat string-to-string map of the concrete decision fields for that step (e.g. {"root_cause": "...", "recoverability_score": "72"}).
+Each step's "reasoning" field should read like real analyst thinking (2-4 sentences), and "output" must be a flat string-to-string map of the concrete decision fields for that step (e.g. {"root_cause": "...", "reference_model_score": "72"}).
 
 Be decisive and specific to the given customer data - do not give generic advice.
 
 Respond with ONLY the JSON object matching the required schema - no prose, no markdown fences.`;
 
-function buildUserPrompt(payment: FailedPayment): string {
+function buildUserPrompt(payment: FailedPayment, modelScore: number, bankGatewayDown: boolean): string {
+  const bankLine = bankGatewayDown
+    ? `\n- Bank gateway status: the issuing bank's gateway is currently flagged as down (simulated check - see lib/bank-uptime.ts). Contact should be deferred until it's back, not sent immediately.`
+    : "";
+
   return `Failed payment event:
 - Customer: ${payment.customerName} (${payment.preferredLanguage} preferred)
 - Plan: ${payment.planName}, Amount: ₹${payment.amount}
@@ -107,6 +111,7 @@ function buildUserPrompt(payment: FailedPayment): string {
 - Customer tenure: ${payment.customerTenureMonths} months
 - Previous successful payments: ${payment.previousSuccessfulPayments}
 - Failed at: ${payment.failedAt}
+- Trained classifier's recoverability estimate: ${modelScore}/100 (reference context for your classify reasoning - see instruction 1)${bankLine}
 
 Produce the full 4-stage recovery plan as structured output.`;
 }
@@ -138,9 +143,29 @@ export async function runRecoveryAgent(payment: FailedPayment): Promise<AgentOut
     )
   );
 
+  // Recoverability is a trained-classifier decision, not an LLM guess - see
+  // lib/recoverability.ts. The LLM gets the score as reference context for its classify
+  // reasoning (see SYSTEM_PROMPT), but does not invent the number itself.
+  const modelScore = predictRecoverability(payment);
+
+  const bankGatewayDown =
+    payment.failureReason === "issuer_unavailable" && isBankGatewayLikelyDown(payment.id);
+  const retryScheduledFor = bankGatewayDown ? nextLikelyUptimeWindow() : undefined;
+  trail.push(
+    auditEntry(
+      "governance",
+      "bank-outage-aware retry scheduling",
+      bankGatewayDown
+        ? `Issuing bank's gateway is flagged down (simulated check). Deferring contact until ${retryScheduledFor}.`
+        : payment.failureReason === "issuer_unavailable"
+          ? "Issuer-unavailable failure, but the bank gateway check came back up - proceeding without deferral."
+          : "Not applicable - failure reason isn't a bank-gateway issue."
+    )
+  );
+
   const response = await getClient().models.generateContent({
     model: MODEL,
-    contents: buildUserPrompt(payment),
+    contents: buildUserPrompt(payment, modelScore, bankGatewayDown),
     config: {
       systemInstruction: SYSTEM_PROMPT,
       responseMimeType: "application/json",
@@ -159,24 +184,31 @@ export async function runRecoveryAgent(payment: FailedPayment): Promise<AgentOut
     auditEntry(
       "agent",
       "4-stage recovery plan generated",
-      `Recoverability ${parsed.recoverabilityScore}/100 · root cause: ${parsed.rootCause}`
+      `Recoverability ${modelScore}/100 (trained classifier) · root cause: ${parsed.rootCause}`
     )
   );
 
-  const postcheck = postcheckRecoverability(parsed.recoverabilityScore);
+  const incentiveCap = capIncentive(parsed.recommendedIncentive, payment);
+  trail.push(auditEntry("governance", "incentive guardrail", incentiveCap.reason));
+
+  const postcheck = postcheckRecoverability(modelScore);
   trail.push(
     auditEntry("governance", "post-check: write-off threshold rule", postcheck.reason)
   );
 
   const result: AgentResult = {
     paymentId: payment.id,
-    recoverabilityScore: parsed.recoverabilityScore,
+    recoverabilityScore: modelScore,
     rootCause: parsed.rootCause,
     recommendedChannel: parsed.recommendedChannel,
     recommendedTiming: parsed.recommendedTiming,
-    recommendedIncentive: parsed.recommendedIncentive,
+    recommendedIncentive: incentiveCap.incentive,
     message: parsed.message,
     retryLink: `https://rzp.io/retry/${payment.subscriptionId.toLowerCase()}`,
+    upiIntentLink: `upi://pay?pa=recoveryagent@razorpay&pn=RecoveryAgent&am=${payment.amount}&cu=INR&tn=${encodeURIComponent(
+      `Retry ${payment.planName}`
+    )}`,
+    retryScheduledFor,
     steps: parsed.steps,
     escalation: postcheck,
     auditTrail: trail,

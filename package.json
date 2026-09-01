@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "train:model": "node scripts/train-recoverability-model.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",

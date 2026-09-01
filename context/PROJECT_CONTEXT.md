@@ -68,7 +68,12 @@ Next.js API routes, deliberately, so there's nothing extra to keep alive for a l
 - **Governance logic lives in code, not the prompt.** `src/lib/escalation.ts` implements
   the max-attempts and write-off rules deterministically, outside the LLM call. This
   directly answers the "compliant escalation, stopping rules" requirement in a way an
-  auditor can verify without re-running the model.
+  auditor can verify without re-running the model. Extended in §5.18 with two siblings in
+  the same spirit: `src/lib/incentive-guard.ts` (caps the LLM's recommended discount
+  against tenure/payment-history rules that used to be prompt-only) and
+  `src/lib/bank-uptime.ts` (defers contact when a simulated bank-gateway-outage check
+  fires for `issuer_unavailable` failures) - the write-off threshold itself is now also
+  driven by a trained classifier's score, not the LLM's own number (§5.18).
 - **Simulated batch outcomes, clearly labeled.** We have no live Razorpay account, so
   "recovered vs lost" in batch mode is a deterministic, score-weighted simulation
   (`src/lib/simulate.ts`), explicitly labeled "(sim.)" in the UI and documented in the
@@ -87,6 +92,12 @@ Next.js API routes, deliberately, so there's nothing extra to keep alive for a l
   reasoning stages (classify/strategize/draft/action) in one structured-output call, then
   the UI reveals them staggered client-side. Cheaper and faster than 4 round-trips; still
   visibly "agentic" because the reasoning is genuinely multi-stage, just batched.
+  Deliberately NOT reopened in §5.18 when asked to "deepen the pipeline" - real
+  sophistication gain came from moving more decisions into deterministic code
+  (incentive guardrails, bank-outage scheduling, trained-model scoring) and enriching
+  the one prompt call with better context (the model's score, channel-aware tone
+  instructions), not from adding round-trips. Documented explicitly as a considered
+  non-reversal, the same rigor applied to the tabs→routes reversal in §5.17.
 - **Gemini over Claude for the model provider** (see §5.7). Functionally equivalent
   architecture either way — this was a provider preference, not a capability gap. Verified
   the actual installed `@google/genai` SDK's own type definitions and README before
@@ -332,6 +343,74 @@ Chronological, most useful for "why does the code look like this."
       failure mode the `suppressHydrationWarning` placement + blocking inline theme script
       are there to prevent).
 
+18. **"Make it more advanced" — shipped the deferred trained model, closed two feature
+    gaps vs. the competitor, and deepened the pipeline without reopening the
+    single-LLM-call decision.** User was asked to prioritize between three directions and
+    chose all three. Implemented together, in this order (train the classifier first
+    since everything else composes on top of its score):
+    - **Trained recoverability classifier** (§7) - `scripts/train-recoverability-model.mjs`
+      (synthetic dataset, hand-rolled logistic regression, held-out metrics) →
+      `src/lib/recoverability-model.ts` (generated weights + metrics) →
+      `src/lib/recoverability.ts` (`predictRecoverability()`, zero-latency inference).
+      `lib/agent.ts` now computes this score BEFORE calling Gemini, gives it to the LLM
+      as reference context for the `classify` stage's reasoning (not something the LLM
+      re-outputs - `recoverabilityScore` was removed from `AgentOutputSchema` /
+      `RESPONSE_JSON_SCHEMA`'s required fields), and uses the model's score (not the
+      LLM's) to drive `postcheckRecoverability`. `AgentResult.recoverabilityScore`'s
+      *type* didn't change, only its source, so no UI component needed edits for this
+      part. Verified directionally by calling the function against realistic payment
+      profiles outside the app (Node's native TS stripping, since the local dev
+      environment's `GEMINI_API_KEY` isn't working - see below): loyal long-tenure
+      customers scored high (86), maxed-out-attempts/zero-tenure customers scored near
+      zero (1-2) - the weights learned the intended signal, not noise.
+    - **Incentive guardrails** - `src/lib/incentive-guard.ts` (`capIncentive()`), a
+      sibling to `escalation.ts` in spirit: what used to be a soft prompt instruction
+      ("don't over-discount brand-new customers") is now a hard, always-applied,
+      auditable rule. Wired into `agent.ts` right after parsing the LLM's output; always
+      logs an audit-trail entry (mirrors `precheckAttempts`'s pattern of logging both the
+      triggered and non-triggered branch).
+    - **Channel-aware drafting tone** - cheap prompt-only addition to the existing
+      "draft" stage instructions in `SYSTEM_PROMPT` (sms/whatsapp short and punchy,
+      voice_call as a spoken script, email slightly more formal). No architecture change.
+    - **Bank-outage-aware retry scheduling + UPI deep link** - closes two concrete gaps
+      vs. the competing "RevShield AI" submission (see §5.17 for that comparison).
+      `src/lib/bank-uptime.ts` (new - DEMO-ONLY simulation, same honesty framing as
+      `simulate.ts`; its shared `hashToUnit` helper moved to `src/lib/hash.ts` so both
+      modules use the same deterministic-per-id randomness). Only consulted for
+      `failureReason: "issuer_unavailable"`; when it fires, `agent.ts` sets
+      `AgentResult.retryScheduledFor` and tells the LLM to defer contact rather than
+      recommend immediate outreach. `AgentResult.upiIntentLink` (new, always
+      constructed) is a `upi://pay?...` deep link built next to the existing mock
+      `retryLink`, same "clearly a demo construction" honesty framing. Both surfaced in
+      `agent-trace-dialog.tsx` (a new informational banner distinct from the two
+      existing `ESCALATION_BANNER` states, and a second CTA link).
+    - **Demo-completeness catch, before shipping**: the only `issuer_unavailable` case in
+      the original 9-row mock dataset (Karan Verma) happened to hash into the "bank
+      gateway is up" bucket, so the new deferral feature would never actually be visible
+      running the seeded demo data out of the box - only via a lucky custom upload.
+      Brute-forced an id (`pay_F470`) whose deterministic hash does land in the "down"
+      bucket and added a 10th mock payment (Divya Nair) using it, specifically so this
+      feature is demoable without extra setup. Same instinct as §5.14's "actually click
+      through the feature" - a feature that's only reachable by chance isn't really
+      shipped for demo purposes.
+    - **Deliberately did not reopen "single LLM call per case, not 4 separate calls"**
+      (§4) despite "deepen the pipeline" plausibly reading as multi-turn refinement -
+      see the §4 bullet for the reasoning, mirrored from how §5.17 documented the
+      opposite call (a considered reversal) for tabs→routes.
+    - **Verification gap, documented rather than glossed over**: `/api/agent` still
+      returns `500` locally (no working `GEMINI_API_KEY` in this dev environment - a
+      pre-existing, previously-flagged issue, confirmed NOT caused by this pass: the
+      response comes back in ~5ms of application-code time, meaning it's hitting the
+      route's existing missing-key guard before any of this session's new code ever
+      runs). Could not verify the live dialog UI (outage banner, UPI link render,
+      staggered reveal) end-to-end through a real model call. What WAS verified: the
+      build/lint pass cleanly with the type changes rippling through every consumer, the
+      training script produces sane non-degenerate metrics, and `predictRecoverability`/
+      `capIncentive`/`isBankGatewayLikelyDown` all produce the intended output when
+      called directly against realistic payment data. The live-dialog check from the
+      original plan's verification section is still outstanding - do it once
+      `GEMINI_API_KEY` is confirmed working.
+
 ---
 
 ## 6. Prior-art reviewed: `HarshSalunkhe2005/Retail-Agentic-AI`
@@ -347,20 +426,16 @@ recoverability-model work in §7.
 
 ---
 
-## 7. Deferred: trained recoverability model
+## 7. Trained recoverability model — shipped (see §5.18)
 
-**Not yet started, by explicit user instruction ("model training later").** Plan when we
-get to it:
-
-1. Generate a larger synthetic labeled dataset: failed-payment features (failure reason,
-   attempt number, tenure, prior successful payments, amount) → recovered/not, using a
-   believable label-generating rule.
-2. Train a small classifier (logistic regression or XGBoost) with a real train/test split.
-3. Report precision/recall/AUC on held-out data in the README/Architecture tab — this is
-   the "measured metrics" language from the buildathon page, applied honestly.
-4. Port the trained model into the Next.js app for inference (avoid running a second
-   Python service in production — keep the single-deployable-app property from §3).
-5. Wire its output into `classify` stage as (or alongside) the LLM's own score.
+Was deferred; built in §5.18. `scripts/train-recoverability-model.mjs` generates a
+synthetic labeled dataset, trains a hand-rolled logistic regression (batch gradient
+descent, L2-regularized, no external ML library), and writes weights + held-out
+precision/recall/accuracy/AUC into the generated `src/lib/recoverability-model.ts`.
+`src/lib/recoverability.ts` does zero-latency inference from those weights at runtime -
+no second service, keeping the single-deployable-app property from §3. Regenerate with
+`npm run train:model`. Current held-out metrics (400 test cases): precision 0.78,
+recall 0.78, accuracy 0.78, AUC 0.88 - also surfaced live in the Architecture tab.
 
 ---
 
