@@ -496,6 +496,30 @@ Chronological, most useful for "why does the code look like this."
     bank-outage scheduling/UPI link/palette picker at all, and had no `npm run train:model`
     or live deployment link. Brought it in line with what's actually shipped.
 
+21. **Competitive gap-check, then closed the biggest one.** Asked directly whether this
+    submission is actually good enough to win placement. Rather than answering from
+    vibes, fetched the live buildathon page (confirmed judging is based on exactly three
+    things - public repo, 5-minute pitch video, architecture documentation - and the bar
+    is "measured money recovered across a batch, with compliant escalation, stopping
+    rules, and an audit trail") and pulled up two real Track 3 competitor submissions
+    (RevShield AI, seen earlier in §5.17; RecoverAI, found via search). RecoverAI
+    specifically exposed a real weakness: it displays a live Razorpay Test API connection
+    while every Razorpay-branded surface in this app was a constructed string
+    (`retryLink`, `upiIntentLink`). Closed that gap: `src/lib/razorpay.ts` calls the real
+    Razorpay Payment Links API (test mode, plain `fetch` + HTTP Basic Auth, not the
+    `razorpay` SDK - one endpoint didn't justify a new dependency) and `lib/agent.ts` now
+    only spends that call on cases actually authorized to proceed (a write-off case's
+    plan is drafted but never sent, so a real link would be wasted for it). Falls back to
+    the existing constructed link, explicitly labeled as such in both the audit trail and
+    a UI badge (`agent-trace-dialog.tsx`), when `RAZORPAY_KEY_ID`/`RAZORPAY_KEY_SECRET`
+    aren't configured - same "never silently blur real vs. simulated" discipline as
+    `simulate.ts` and `bank-uptime.ts`. Settlement confirmation (did the customer actually
+    pay) is still honestly labeled as simulated - that would need a webhook loop this
+    build doesn't run unattended, a materially different claim from "the link is real."
+    Verified: build/lint clean, the no-keys fallback path exercised directly (this
+    session has no Razorpay test keys available to it) - the live-key path is unverified
+    pending the user adding `RAZORPAY_KEY_ID`/`RAZORPAY_KEY_SECRET` locally and on Vercel.
+
 ---
 
 ## 6. Prior-art reviewed: `HarshSalunkhe2005/Retail-Agentic-AI`
@@ -556,7 +580,8 @@ notes the split methodology.
   built from the audit log's persisted history — the buildathon's "measured across
   batches" requirement made visual (see §5.15)
 - ⏳ Trained recoverability model (§7)
-- ⏳ Real Razorpay test-mode retry-link generation (currently a constructed mock URL)
+- ✅ Real Razorpay test-mode retry-link generation via the Payment Links API (see §5.21)
+  - falls back to the old constructed mock URL, clearly labeled, if keys aren't set
 - ⏳ 5-minute pitch video
 - ✅ Deployment (Vercel) — live at `razor-pay-five-bice.vercel.app`. CLI device-login only
   works from the user's own terminal (see §5.12), so the user ran `vercel deploy`

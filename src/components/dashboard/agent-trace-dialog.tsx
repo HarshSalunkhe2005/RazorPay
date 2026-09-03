@@ -261,8 +261,21 @@ function AgentResultView({ result }: { result: AgentResult }) {
       </div>
 
       <div className="rounded-xl border border-primary/20 bg-primary/5 p-4">
-        <p className="text-xs font-medium uppercase tracking-wide text-primary">
+        <p className="flex flex-wrap items-center gap-2 text-xs font-medium uppercase tracking-wide text-primary">
           Drafted message {result.escalation.action !== "proceed" && "(not sent — see above)"}
+          {result.escalation.action === "proceed" && (
+            <Badge
+              variant="outline"
+              className={cn(
+                "normal-case",
+                result.retryLinkIsLive
+                  ? "border-success/30 bg-success/10 text-success"
+                  : "border-border/60 text-muted-foreground"
+              )}
+            >
+              {result.retryLinkIsLive ? "Live Razorpay test-mode link" : "Demo link (Razorpay keys not set)"}
+            </Badge>
+          )}
         </p>
         <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-foreground">
           {result.message}

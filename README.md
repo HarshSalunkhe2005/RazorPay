@@ -9,7 +9,7 @@ Instead of firing the same generic "your payment failed, please retry" email at 
 1. **Classify** — diagnoses the real root cause behind the failure (not just the raw decline code). Recoverability is scored by a **trained logistic-regression classifier** (`scripts/train-recoverability-model.mjs`), not an LLM guess — the model gets the score as reference context, not something it invents.
 2. **Strategize** — picks the best recovery channel (email / SMS / WhatsApp / voice), timing, and incentive, weighing it against the customer's tenure and payment history. A deterministic **incentive guardrail** (`lib/incentive-guard.ts`) caps discounts/waivers for unproven customers regardless of what the model recommends, and a **bank-outage check** (`lib/bank-uptime.ts`) defers contact instead of retrying into a known-down gateway.
 3. **Draft** — writes the actual outbound message, in the customer's preferred language and channel-appropriate tone (short/punchy for SMS/WhatsApp, a spoken script for voice, natural Hinglish where relevant — not literal translation).
-4. **Act** — generates a fresh retry payment link plus a 1-tap UPI deep link, and summarizes the automated next step.
+4. **Act** — generates a fresh retry payment link (a genuine Razorpay Payment Links API test-mode response, not a constructed URL) plus a 1-tap UPI deep link, and summarizes the automated next step.
 
 The dashboard shows this reasoning live (staggered reveal, not a single opaque LLM call) so it's visibly an agent working the case, not a black box. A persistent nav bar (`/`, `/batch`, `/audit`, `/architecture`) replaces a single scrolling page, with a light/dark toggle and a choice of three color palettes.
 
@@ -18,6 +18,7 @@ The dashboard shows this reasoning live (staggered reveal, not a single opaque L
 - **Next.js 16** (App Router) + TypeScript + Tailwind CSS
 - **shadcn/ui** components, `next-themes` for light/dark mode
 - **Gemini API** (`@google/genai`, model `gemini-3.6-flash`) with structured JSON outputs (`responseJsonSchema`, validated with Zod) driving the 4-stage agent pipeline
+- **Razorpay Payment Links API** (test mode) for real, live retry links — falls back to a clearly-labeled demo link if `RAZORPAY_KEY_ID`/`RAZORPAY_KEY_SECRET` aren't set
 - A hand-rolled logistic-regression classifier (no external ML library, no second service — trained offline, shipped as plain TypeScript constants, zero-latency inference at request time)
 - Seeded mock dataset simulating Razorpay failed-payment/subscription-renewal webhook events — no live payments account required to demo
 
@@ -25,7 +26,7 @@ The dashboard shows this reasoning live (staggered reveal, not a single opaque L
 
 ```bash
 npm install
-cp .env.example .env.local   # add your GEMINI_API_KEY (get one at aistudio.google.com/apikey)
+cp .env.example .env.local   # add GEMINI_API_KEY (required) + RAZORPAY_KEY_ID/SECRET (optional, test mode)
 npm run dev
 ```
 
@@ -61,6 +62,7 @@ src/
     escalation.ts                  Governance layer: pre-check/post-check stopping rules
     incentive-guard.ts              Governance layer: deterministic discount/waiver caps
     bank-uptime.ts                   Demo-only simulated bank-gateway-outage check
+    razorpay.ts                       Real Razorpay Payment Links API call (test mode), graceful fallback
     recoverability.ts / recoverability-model.ts   Trained-classifier inference (generated file + runtime)
     recovery-state.tsx                App state (Context), shared across all routes
     palette.tsx                        Brand-color palette state, independent of light/dark mode
@@ -75,4 +77,4 @@ the buildathon page, and what's still deferred.
 
 ## Deploying
 
-Any Vercel/Node host works. Set `GEMINI_API_KEY` as a server-side environment variable — it is never exposed to the client. Note that this is separate from a local `.env.local`: setting the key on Vercel does not make it available to `npm run dev` on your own machine, and vice versa.
+Any Vercel/Node host works. Set `GEMINI_API_KEY` (required) and `RAZORPAY_KEY_ID`/`RAZORPAY_KEY_SECRET` (optional, test mode) as server-side environment variables — never exposed to the client. Note that this is separate from a local `.env.local`: setting a key on Vercel does not make it available to `npm run dev` on your own machine, and vice versa.

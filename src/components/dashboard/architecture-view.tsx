@@ -17,10 +17,14 @@ export function ArchitectureView() {
         <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
           Batch Run processes every open case through the same pipeline with bounded
           concurrency and reports aggregate ₹ recovered, recovery rate, and channel mix.
-          Since this build has no live Razorpay account wired in, the actual payment
-          outcome is a clearly labeled simulation seeded by the model&rsquo;s own
-          recoverability score — the metrics machinery is real, the settlement confirmation
-          is the one piece not live yet.
+          Every authorized case&rsquo;s retry link is a real Razorpay Payment Links API
+          (test mode) response, not a constructed URL — when
+          {" "}<code className="font-figures">RAZORPAY_KEY_ID</code>/<code className="font-figures">RAZORPAY_KEY_SECRET</code>{" "}
+          are configured (falls back to a clearly-labeled demo link otherwise). What&rsquo;s
+          still a clearly labeled simulation is the settlement outcome itself — confirming
+          whether a customer actually completed that payment requires a webhook loop this
+          build doesn&rsquo;t run unattended, so recovered/lost is seeded by the model&rsquo;s
+          own recoverability score instead.
         </p>
       </div>
       <div className="rounded-2xl border border-border/60 p-5">
@@ -42,8 +46,9 @@ export function ArchitectureView() {
         <p className="text-sm font-medium text-foreground">Stack</p>
         <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
           Next.js 16 (App Router) + TypeScript + Tailwind, shadcn/ui components, Gemini API
-          (structured JSON outputs via Zod) for the reasoning stages, all server-side —
-          deployable as a single app with no separate services to keep alive for a demo.
+          (structured JSON outputs via Zod) for the reasoning stages, Razorpay Payment
+          Links API for live test-mode retry links, all server-side — deployable as a
+          single app with no separate services to keep alive for a demo.
         </p>
       </div>
     </div>

@@ -71,8 +71,13 @@ export interface AgentResult {
   recommendedIncentive: Incentive;
   message: string;
   retryLink: string;
+  /** True when retryLink is a genuine Razorpay Payment Links API (test mode) response,
+   * false when it's the constructed fallback (no RAZORPAY_KEY_ID/SECRET configured, or
+   * the call failed) - see lib/razorpay.ts. Surfaced in the UI so the distinction is
+   * never silently blurred. */
+  retryLinkIsLive: boolean;
   /** UPI deep link (upi://pay?...) for 1-tap payment via GPay/PhonePe/etc - a demo
-   * construction against a mock VPA, same honesty framing as retryLink. */
+   * construction against a mock VPA, same honesty framing as a fallback retryLink. */
   upiIntentLink: string;
   /** Set when a deterministic bank-gateway-outage check (lib/bank-uptime.ts) defers this
    * case's contact instead of recommending immediate outreach. Absent for the common

@@ -10,6 +10,7 @@ import {
 import { predictRecoverability } from "./recoverability";
 import { capIncentive } from "./incentive-guard";
 import { isBankGatewayLikelyDown, nextLikelyUptimeWindow } from "./bank-uptime";
+import { createRazorpayPaymentLink } from "./razorpay";
 
 const MODEL = "gemini-3.6-flash";
 
@@ -204,6 +205,25 @@ export async function runRecoveryAgent(payment: FailedPayment): Promise<AgentOut
     auditEntry("governance", "post-check: write-off threshold rule", postcheck.reason)
   );
 
+  // Only spend a real API call generating a live link for a case actually authorized to
+  // proceed - a write-off case's plan is drafted but never sent (see architecture-view.tsx),
+  // so there's nothing for a real payment link to do there.
+  let liveLink: Awaited<ReturnType<typeof createRazorpayPaymentLink>> = null;
+  if (postcheck.action === "proceed") {
+    liveLink = await createRazorpayPaymentLink(payment);
+  }
+  trail.push(
+    auditEntry(
+      "governance",
+      "retry link generation",
+      postcheck.action !== "proceed"
+        ? "Case not authorized to proceed - no payment link generated."
+        : liveLink
+          ? `Live Razorpay test-mode payment link created (id: ${liveLink.id}).`
+          : "RAZORPAY_KEY_ID/RAZORPAY_KEY_SECRET not configured (or the API call failed) - used a constructed demo link instead."
+    )
+  );
+
   const result: AgentResult = {
     paymentId: payment.id,
     recoverabilityScore: modelScore,
@@ -212,7 +232,8 @@ export async function runRecoveryAgent(payment: FailedPayment): Promise<AgentOut
     recommendedTiming: parsed.recommendedTiming,
     recommendedIncentive: incentiveCap.incentive,
     message: parsed.message,
-    retryLink: `https://rzp.io/retry/${payment.subscriptionId.toLowerCase()}`,
+    retryLink: liveLink?.shortUrl ?? `https://rzp.io/retry/${payment.subscriptionId.toLowerCase()}`,
+    retryLinkIsLive: liveLink !== null,
     upiIntentLink: `upi://pay?pa=recoveryagent@razorpay&pn=RecoveryAgent&am=${payment.amount}&cu=INR&tn=${encodeURIComponent(
       `Retry ${payment.planName}`
     )}`,
