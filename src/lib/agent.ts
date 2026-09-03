@@ -180,6 +180,14 @@ export async function runRecoveryAgent(payment: FailedPayment): Promise<AgentOut
 
   const parsed = AgentOutputSchema.parse(JSON.parse(raw));
 
+  // The model occasionally mislabels a step's "stage" field (e.g. two steps both tagged
+  // "classify") even though the prompt asks for classify/strategize/draft/action in that
+  // exact order and the schema already enforces exactly 4 steps. Rather than rejecting an
+  // otherwise-good response over a label slip, trust the position (which the prompt does
+  // guarantee) over the model's own stage string.
+  const STAGE_ORDER = ["classify", "strategize", "draft", "action"] as const;
+  const steps = parsed.steps.map((step, i) => ({ ...step, stage: STAGE_ORDER[i] }));
+
   trail.push(
     auditEntry(
       "agent",
@@ -209,7 +217,7 @@ export async function runRecoveryAgent(payment: FailedPayment): Promise<AgentOut
       `Retry ${payment.planName}`
     )}`,
     retryScheduledFor,
-    steps: parsed.steps,
+    steps,
     escalation: postcheck,
     auditTrail: trail,
     generatedAt: new Date().toISOString(),

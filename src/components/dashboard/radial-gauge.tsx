@@ -40,8 +40,8 @@ export function RadialGauge({
       <svg width={size} height={size} className="-rotate-90">
         <defs>
           <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor={gradientFrom} />
-            <stop offset="100%" stopColor={gradientTo} />
+            <stop offset="0%" style={{ stopColor: gradientFrom }} />
+            <stop offset="100%" style={{ stopColor: gradientTo }} />
           </linearGradient>
         </defs>
         <circle

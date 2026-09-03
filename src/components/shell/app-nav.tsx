@@ -1,10 +1,14 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { Menu, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useRecoveryState } from "@/lib/recovery-state";
+import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "./theme-toggle";
+import { PalettePicker } from "./palette-picker";
 
 const NAV_ITEMS = [
   { href: "/", label: "Queue" },
@@ -13,7 +17,17 @@ const NAV_ITEMS = [
   { href: "/architecture", label: "Architecture" },
 ] as const;
 
-function NavLink({ href, label }: { href: string; label: string }) {
+function NavLink({
+  href,
+  label,
+  onNavigate,
+  block,
+}: {
+  href: string;
+  label: string;
+  onNavigate?: () => void;
+  block?: boolean;
+}) {
   const pathname = usePathname();
   const isActive = href === "/" ? pathname === "/" : pathname.startsWith(href);
   const { auditLog } = useRecoveryState();
@@ -22,8 +36,10 @@ function NavLink({ href, label }: { href: string; label: string }) {
   return (
     <Link
       href={href}
+      onClick={onNavigate}
       className={cn(
-        "rounded-lg px-3 py-1.5 text-sm font-medium transition-colors",
+        "rounded-lg px-3 py-1.5 text-sm font-medium whitespace-nowrap transition-colors",
+        block && "block w-full",
         isActive ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground"
       )}
     >
@@ -34,6 +50,8 @@ function NavLink({ href, label }: { href: string; label: string }) {
 }
 
 export function AppNav() {
+  const [mobileOpen, setMobileOpen] = useState(false);
+
   return (
     <nav className="sticky top-0 z-40 border-b border-border/60 bg-background/80 backdrop-blur-md">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
@@ -52,14 +70,45 @@ export function AppNav() {
           </div>
         </div>
 
-        <div className="flex items-center gap-1 overflow-x-auto">
+        {/* Full nav - hidden below sm, where it doesn't reliably fit alongside the
+            palette picker and theme toggle without silently scrolling a link
+            off-screen with no visible affordance. */}
+        <div className="hidden items-center gap-1 sm:flex">
           {NAV_ITEMS.map((item) => (
             <NavLink key={item.href} {...item} />
           ))}
         </div>
+        <div className="hidden shrink-0 items-center gap-2 sm:flex">
+          <PalettePicker />
+          <ThemeToggle />
+        </div>
 
-        <ThemeToggle />
+        {/* Mobile: compact bar, everything else behind a disclosure panel. */}
+        <div className="flex shrink-0 items-center gap-1 sm:hidden">
+          <ThemeToggle />
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label={mobileOpen ? "Close menu" : "Open menu"}
+            onClick={() => setMobileOpen((v) => !v)}
+          >
+            {mobileOpen ? <X className="size-4" /> : <Menu className="size-4" />}
+          </Button>
+        </div>
       </div>
+
+      {mobileOpen && (
+        <div className="border-t border-border/60 px-4 py-3 sm:hidden">
+          <div className="flex flex-col gap-1">
+            {NAV_ITEMS.map((item) => (
+              <NavLink key={item.href} {...item} block onNavigate={() => setMobileOpen(false)} />
+            ))}
+          </div>
+          <div className="mt-3 border-t border-border/60 pt-3">
+            <PalettePicker />
+          </div>
+        </div>
+      )}
     </nav>
   );
 }

@@ -36,11 +36,14 @@ const FAILURE_REASONS = [
 
 const NUMERIC_FEATURES = ["attemptNumber", "customerTenureMonths", "previousSuccessfulPayments", "amount"];
 
-const DATASET_SIZE = 2000;
-const TEST_FRACTION = 0.2;
-const LEARNING_RATE = 0.15;
-const EPOCHS = 800;
-const L2_LAMBDA = 0.01;
+const DATASET_SIZE = 4000;
+const VAL_FRACTION = 0.15;
+const TEST_FRACTION = 0.15;
+const EPOCHS = 1000;
+
+// Grid searched on the validation split below, not fixed guesses - see the "Run" section.
+const LEARNING_RATE_GRID = [0.05, 0.1, 0.2];
+const L2_LAMBDA_GRID = [0.001, 0.01, 0.05, 0.1];
 
 // --- Synthetic dataset generation -------------------------------------------------
 
@@ -129,12 +132,12 @@ function sigmoid(x) {
   return 1 / (1 + Math.exp(-x));
 }
 
-function trainLogisticRegression(X, y, numFeatures) {
+function trainLogisticRegression(X, y, numFeatures, learningRate, l2Lambda, epochs) {
   let weights = new Array(numFeatures).fill(0);
   let bias = 0;
   const n = X.length;
 
-  for (let epoch = 0; epoch < EPOCHS; epoch++) {
+  for (let epoch = 0; epoch < epochs; epoch++) {
     const gradW = new Array(numFeatures).fill(0);
     let gradB = 0;
 
@@ -146,9 +149,9 @@ function trainLogisticRegression(X, y, numFeatures) {
     }
 
     for (let f = 0; f < numFeatures; f++) {
-      weights[f] -= LEARNING_RATE * (gradW[f] / n + L2_LAMBDA * weights[f]);
+      weights[f] -= learningRate * (gradW[f] / n + l2Lambda * weights[f]);
     }
-    bias -= LEARNING_RATE * (gradB / n);
+    bias -= learningRate * (gradB / n);
   }
 
   return { weights, bias };
@@ -215,33 +218,74 @@ function computeAUC(predictions, labels) {
 }
 
 // --- Run -------------------------------------------------------------------------
+//
+// Three-way split, not just train/test: the validation slice is used to grid-search
+// learning rate and L2 regularization strength (a real fine-tuning step, not fixed
+// guesses), and the final reported precision/recall/AUC come from the test slice, which
+// neither training nor hyperparameter selection ever touches.
 
 const rows = Array.from({ length: DATASET_SIZE }, generateRow);
 const labels = rows.map(labelRow);
 
-const splitIndex = Math.floor(DATASET_SIZE * (1 - TEST_FRACTION));
-const trainRows = rows.slice(0, splitIndex);
-const trainLabels = labels.slice(0, splitIndex);
-const testRows = rows.slice(splitIndex);
-const testLabels = labels.slice(splitIndex);
+const trainEnd = Math.floor(DATASET_SIZE * (1 - VAL_FRACTION - TEST_FRACTION));
+const valEnd = Math.floor(DATASET_SIZE * (1 - TEST_FRACTION));
 
-// Normalization stats come from the TRAIN split only, to avoid leaking test-set
-// information into the features - applied identically to both splits, and shipped
+const trainRows = rows.slice(0, trainEnd);
+const trainLabels = labels.slice(0, trainEnd);
+const valRows = rows.slice(trainEnd, valEnd);
+const valLabels = labels.slice(trainEnd, valEnd);
+const testRows = rows.slice(valEnd);
+const testLabels = labels.slice(valEnd);
+
+// Normalization stats come from the TRAIN split only, to avoid leaking val/test
+// information into the features - applied identically to all three splits, and shipped
 // in the generated output so runtime inference uses the exact same stats.
 const numericStats = {};
 for (const key of NUMERIC_FEATURES) numericStats[key] = computeStats(trainRows, key);
 
 const trainX = trainRows.map((r) => buildFeatureVector(r, numericStats));
+const valX = valRows.map((r) => buildFeatureVector(r, numericStats));
 const testX = testRows.map((r) => buildFeatureVector(r, numericStats));
 
 const numFeatures = NUMERIC_FEATURES.length + FAILURE_REASONS.length;
-const { weights, bias } = trainLogisticRegression(trainX, trainLabels, numFeatures);
+
+let best = null;
+for (const learningRate of LEARNING_RATE_GRID) {
+  for (const l2Lambda of L2_LAMBDA_GRID) {
+    const { weights, bias } = trainLogisticRegression(trainX, trainLabels, numFeatures, learningRate, l2Lambda, EPOCHS);
+    const valMetrics = evaluate(valX, valLabels, weights, bias);
+    if (!best || valMetrics.auc > best.valAuc) {
+      best = { learningRate, l2Lambda, weights, bias, valAuc: valMetrics.auc };
+    }
+  }
+}
+
+console.log(
+  `Best hyperparameters (by validation AUC): learningRate=${best.learningRate} l2Lambda=${best.l2Lambda} ` +
+    `(val AUC ${best.valAuc.toFixed(3)})`
+);
+
+// Refit on train+val combined with the winning hyperparameters, same pattern as a
+// standard train/val/test workflow - val's only job was picking the hyperparameters, so
+// folding it back in for the final fit doesn't leak test information and uses more data.
+const finalX = trainX.concat(valX);
+const finalLabels = trainLabels.concat(valLabels);
+const { weights, bias } = trainLogisticRegression(
+  finalX,
+  finalLabels,
+  numFeatures,
+  best.learningRate,
+  best.l2Lambda,
+  EPOCHS
+);
 const metrics = evaluate(testX, testLabels, weights, bias);
 
 console.log("Recoverability model trained.");
-console.log(`Dataset: ${DATASET_SIZE} rows (${trainRows.length} train / ${testRows.length} test)`);
 console.log(
-  `Held-out metrics: precision=${metrics.precision.toFixed(3)} recall=${metrics.recall.toFixed(3)} ` +
+  `Dataset: ${DATASET_SIZE} rows (${trainRows.length} train / ${valRows.length} val / ${testRows.length} test)`
+);
+console.log(
+  `Held-out test metrics: precision=${metrics.precision.toFixed(3)} recall=${metrics.recall.toFixed(3)} ` +
     `accuracy=${metrics.accuracy.toFixed(3)} auc=${metrics.auc.toFixed(3)}`
 );
 
@@ -250,9 +294,11 @@ const output = `// AUTO-GENERATED by scripts/train-recoverability-model.mjs - do
 //
 // Trained on a synthetic labeled dataset (see the script for the labeling rule) since
 // this buildathon build has no live payments account / real recovery outcome history.
-// Precision/recall/AUC below are honest measurements against a held-out 20% split of
-// that synthetic data - they describe how well the model learned the documented rule,
-// not a claim about real-world recovery rates.
+// Precision/recall/AUC below are honest measurements against a held-out ${Math.round(TEST_FRACTION * 100)}%
+// test split that never touches training or hyperparameter selection (a separate
+// ${Math.round(VAL_FRACTION * 100)}% validation split, folded back into the final fit after being used only
+// to grid-search learning rate/L2 strength, handles that) - they describe how well the
+// model learned the documented rule, not a claim about real-world recovery rates.
 
 export const MODEL_WEIGHTS = {
   numericFeatures: ${JSON.stringify(NUMERIC_FEATURES)} as const,
@@ -268,8 +314,14 @@ export const MODEL_METRICS = {
   accuracy: ${metrics.accuracy},
   auc: ${metrics.auc},
   datasetSize: ${DATASET_SIZE},
-  trainSize: ${trainRows.length},
+  trainSize: ${trainRows.length + valRows.length},
   testSize: ${testRows.length},
+  hyperparameters: {
+    learningRate: ${best.learningRate},
+    l2Lambda: ${best.l2Lambda},
+    epochs: ${EPOCHS},
+    selectedByValidationAuc: ${best.valAuc},
+  },
   trainedAt: ${JSON.stringify(new Date().toISOString())},
 };
 `;

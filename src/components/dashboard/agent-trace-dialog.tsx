@@ -27,10 +27,16 @@ import { WRITE_OFF_SCORE_THRESHOLD } from "@/lib/escalation";
  * elsewhere for destructive / neutral / success states. */
 function scoreGaugeColors(score: number) {
   if (score < WRITE_OFF_SCORE_THRESHOLD) {
-    return { gradientFrom: "oklch(0.7 0.19 30)", gradientTo: "oklch(0.65 0.2 25)" };
+    return {
+      gradientFrom: "color-mix(in oklch, var(--destructive), white 12%)",
+      gradientTo: "color-mix(in oklch, var(--destructive), black 12%)",
+    };
   }
   if (score >= 70) {
-    return { gradientFrom: "oklch(0.78 0.15 165)", gradientTo: "oklch(0.72 0.17 165)" };
+    return {
+      gradientFrom: "color-mix(in oklch, var(--success), white 12%)",
+      gradientTo: "color-mix(in oklch, var(--success), black 12%)",
+    };
   }
   return { gradientFrom: "var(--primary)", gradientTo: "var(--accent)" };
 }

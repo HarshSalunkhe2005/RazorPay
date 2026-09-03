@@ -134,6 +134,66 @@
   --color-escalated-foreground: var(--escalated-foreground);
 }
 
+/*
+ * Alternate brand palettes, chosen via [data-palette] on <html> (see lib/palette.tsx).
+ * Amber/teal above is the default and needs no [data-palette] selector. Only the brand
+ * pair (primary/accent + their dependents: ring, chart-1/chart-3, sidebar-primary) varies
+ * per palette - background/border/muted stay the shared warm neutral base, and
+ * success/destructive/escalated/chart-2/chart-4/chart-5 stay fixed semantic colors
+ * (recovered/failed/escalated/write-off shouldn't change meaning with a brand reskin).
+ * Every decorative utility below (.bg-mesh, .text-gradient-brand, .glow-ring, .neu-tile)
+ * already reads var(--primary)/var(--accent)/var(--card), so it repaints automatically -
+ * nothing else in this file needs touching per palette.
+ */
+
+[data-palette="emerald"] {
+  --primary: oklch(0.5 0.15 155);
+  --primary-foreground: oklch(0.99 0 0);
+  --accent: oklch(0.55 0.17 125);
+  --accent-foreground: oklch(0.16 0.02 125);
+  --ring: oklch(0.5 0.15 155 / 45%);
+  --chart-1: oklch(0.5 0.15 155);
+  --chart-3: oklch(0.55 0.17 125);
+  --sidebar-primary: oklch(0.5 0.15 155);
+  --sidebar-primary-foreground: oklch(0.99 0 0);
+}
+
+.dark[data-palette="emerald"] {
+  --primary: oklch(0.72 0.15 155);
+  --primary-foreground: oklch(0.15 0.02 155);
+  --accent: oklch(0.78 0.18 125);
+  --accent-foreground: oklch(0.15 0.02 125);
+  --ring: oklch(0.72 0.15 155 / 50%);
+  --chart-1: oklch(0.72 0.15 155);
+  --chart-3: oklch(0.78 0.18 125);
+  --sidebar-primary: oklch(0.72 0.15 155);
+  --sidebar-primary-foreground: oklch(0.15 0.02 155);
+}
+
+[data-palette="coral"] {
+  --primary: oklch(0.6 0.19 35);
+  --primary-foreground: oklch(0.99 0 0);
+  --accent: oklch(0.42 0.03 250);
+  --accent-foreground: oklch(0.99 0.005 250);
+  --ring: oklch(0.6 0.19 35 / 45%);
+  --chart-1: oklch(0.6 0.19 35);
+  --chart-3: oklch(0.42 0.03 250);
+  --sidebar-primary: oklch(0.6 0.19 35);
+  --sidebar-primary-foreground: oklch(0.99 0 0);
+}
+
+.dark[data-palette="coral"] {
+  --primary: oklch(0.72 0.18 35);
+  --primary-foreground: oklch(0.16 0.02 35);
+  --accent: oklch(0.62 0.03 250);
+  --accent-foreground: oklch(0.98 0.005 250);
+  --ring: oklch(0.72 0.18 35 / 50%);
+  --chart-1: oklch(0.72 0.18 35);
+  --chart-3: oklch(0.62 0.03 250);
+  --sidebar-primary: oklch(0.72 0.18 35);
+  --sidebar-primary-foreground: oklch(0.16 0.02 35);
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

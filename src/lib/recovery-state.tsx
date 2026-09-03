@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { failedPayments } from "@/lib/mock-data";
 import { FailedPayment, PaymentStatus, AuditLogRecord } from "@/lib/types";
 import { computeStats, DashboardStats } from "@/lib/stats";
@@ -42,58 +42,80 @@ export function RecoveryStateProvider({ children }: { children: React.ReactNode 
     Promise.resolve().then(() => setAuditLog(loadAuditLog()));
   }, []);
 
-  function appendAuditRecords(records: AuditLogRecord[]) {
+  const appendAuditRecords = useCallback((records: AuditLogRecord[]) => {
     setAuditLog((prev) => {
       const next = [...records, ...prev];
       saveAuditLog(next);
       return next;
     });
-  }
+  }, []);
 
-  function handleClearAuditLog() {
+  const handleClearAuditLog = useCallback(() => {
     clearAuditLog();
     setAuditLog([]);
-  }
+  }, []);
 
-  function handleStatusChange(paymentId: string, status: PaymentStatus) {
+  const handleStatusChange = useCallback((paymentId: string, status: PaymentStatus) => {
     setPayments((prev) => prev.map((p) => (p.id === paymentId ? { ...p, status } : p)));
-  }
+  }, []);
 
-  function handleBatchComplete(updates: { paymentId: string; status: PaymentStatus }[]) {
+  const handleBatchComplete = useCallback((updates: { paymentId: string; status: PaymentStatus }[]) => {
     setPayments((prev) => {
       const map = new Map(updates.map((u) => [u.paymentId, u.status]));
       return prev.map((p) => (map.has(p.id) ? { ...p, status: map.get(p.id)! } : p));
     });
-  }
+  }, []);
 
-  function handleDatasetReplace(next: FailedPayment[], sourceLabel: string) {
+  const handleDatasetReplace = useCallback((next: FailedPayment[], sourceLabel: string) => {
     setPayments(next);
     setDatasetLabel(`${next.length} case${next.length === 1 ? "" : "s"} from ${sourceLabel}`);
     setIsSample(false);
     setDatasetVersion((v) => v + 1);
-  }
+  }, []);
 
-  function handleDatasetReset() {
+  const handleDatasetReset = useCallback(() => {
     setPayments(failedPayments);
     setDatasetLabel(`${failedPayments.length} sample cases`);
     setIsSample(true);
     setDatasetVersion((v) => v + 1);
-  }
+  }, []);
 
-  const value: RecoveryStateValue = {
-    payments,
-    stats,
-    auditLog,
-    datasetLabel,
-    datasetVersion,
-    isSample,
-    handleStatusChange,
-    handleBatchComplete,
-    appendAuditRecords,
-    handleClearAuditLog,
-    handleDatasetReplace,
-    handleDatasetReset,
-  };
+  // Memoized so a change to one piece of state (e.g. a payment status flip) doesn't
+  // force every consumer to re-render - AppNav is now mounted on every route (unlike
+  // before this session's routing migration), so an unmemoized value here would
+  // re-render the whole nav bar on state changes it never reads. The handlers above are
+  // all useCallback'd with stable (setter-only) dependencies specifically so they don't
+  // defeat this memoization by changing identity every render.
+  const value: RecoveryStateValue = useMemo(
+    () => ({
+      payments,
+      stats,
+      auditLog,
+      datasetLabel,
+      datasetVersion,
+      isSample,
+      handleStatusChange,
+      handleBatchComplete,
+      appendAuditRecords,
+      handleClearAuditLog,
+      handleDatasetReplace,
+      handleDatasetReset,
+    }),
+    [
+      payments,
+      stats,
+      auditLog,
+      datasetLabel,
+      datasetVersion,
+      isSample,
+      handleStatusChange,
+      handleBatchComplete,
+      appendAuditRecords,
+      handleClearAuditLog,
+      handleDatasetReplace,
+      handleDatasetReset,
+    ]
+  );
 
   return <RecoveryStateContext.Provider value={value}>{children}</RecoveryStateContext.Provider>;
 }

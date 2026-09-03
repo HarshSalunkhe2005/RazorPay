@@ -34,11 +34,11 @@ export function capIncentive(recommended: Incentive, payment: FailedPayment): In
     };
   }
 
-  if (recommended === "discount_20" && !isLoyal) {
+  if ((recommended === "discount_20" || recommended === "fee_waiver") && !isLoyal) {
     return {
       incentive: "discount_10",
       overridden: true,
-      reason: `20% discount requires >= ${LOYAL_TENURE_MONTHS} months tenure and >= ${LOYAL_PRIOR_PAYMENTS} prior successful payments (loyal, proven customer). This case doesn't clear that bar - capped to 10%.`,
+      reason: `"${recommended}" requires >= ${LOYAL_TENURE_MONTHS} months tenure and >= ${LOYAL_PRIOR_PAYMENTS} prior successful payments (loyal, proven customer) - a full fee waiver or 20% discount is at least as costly as a 20% discount. This case doesn't clear that bar - capped to 10%.`,
     };
   }
 

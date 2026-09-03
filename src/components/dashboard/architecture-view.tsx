@@ -31,7 +31,8 @@ export function ArchitectureView() {
           count → recovered/not — see <code className="font-figures">scripts/train-recoverability-model.mjs</code>),
           held out and measured honestly: precision {(MODEL_METRICS.precision * 100).toFixed(0)}%,
           recall {(MODEL_METRICS.recall * 100).toFixed(0)}%, AUC {MODEL_METRICS.auc.toFixed(2)} on
-          {" "}{MODEL_METRICS.testSize} held-out cases. It runs in-process (no second
+          {" "}{MODEL_METRICS.testSize} held-out cases, from a separate validation split
+          that never touches the reported test numbers. It runs in-process (no second
           service, zero added latency) and drives the write-off governance rule directly —
           the LLM sees this score as reference context and stays for what it&rsquo;s
           actually good at: strategy and drafting.

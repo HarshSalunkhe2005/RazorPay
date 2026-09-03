@@ -407,9 +407,94 @@ Chronological, most useful for "why does the code look like this."
       build/lint pass cleanly with the type changes rippling through every consumer, the
       training script produces sane non-degenerate metrics, and `predictRecoverability`/
       `capIncentive`/`isBankGatewayLikelyDown` all produce the intended output when
-      called directly against realistic payment data. The live-dialog check from the
-      original plan's verification section is still outstanding - do it once
-      `GEMINI_API_KEY` is confirmed working.
+      called directly against realistic payment data. **Resolved in §5.19**: the local
+      500 turned out to be a missing `.env.local` (the key was only ever set on Vercel,
+      never locally) - confirmed by hitting the live deployment's `/api/agent` directly
+      for Divya Nair's case, which returned a real 200 with the model score, deferred
+      retry, UPI link, and incentive guardrail all firing correctly end-to-end.
+
+19. **Post-verification bug hunt (user asked to "find more bugs" after the §5.18 live
+    check surfaced one real one) + model hyperparameter tuning + a 3-palette picker.**
+    Three more small asks bundled together:
+    - **Real bug from the live §5.18 test, fixed**: the live response showed two steps
+      both tagged `"stage": "classify"` instead of `"classify"` then `"strategize"` -
+      the schema only enforced exactly 4 steps, not that they're the 4 distinct correct
+      stages in order. Fixed in `lib/agent.ts` by trusting step *position* (which the
+      prompt does guarantee) over the model's own `stage` string: `parsed.steps.map((step, i) => ({ ...step, stage: STAGE_ORDER[i] }))`,
+      rather than rejecting an otherwise-good response over a label slip.
+    - **Model fine-tuning, done properly**: `scripts/train-recoverability-model.mjs`
+      rewritten from a fixed-hyperparameter single train/test split to a real train/val/
+      test split (70/15/15 of 4000 rows) with a small grid search (learning rate ×
+      L2 lambda) selected by validation AUC, then refit on train+val before the final,
+      never-touched-during-selection test-split metrics are reported. This is what
+      "fine-tune the model" means for a from-scratch classifier with no pretrained
+      checkpoint to adjust - honest hyperparameter search, not just re-running with
+      different guesses.
+    - **Bug hunt**: ran a 4-pass review (correctness/diff-scan, cross-file/pitfalls,
+      reuse/simplify/efficiency, altitude/conventions) across everything changed this
+      session (`346d0bd..HEAD` + working tree). Two independent passes converged on the
+      same real finding - `agent-trace-dialog.tsx`'s `scoreGaugeColors()` had two of its
+      three score bands still hardcoded to dark-mode-tuned oklch literals left over from
+      before the light/dark rewrite (the exact same bug class already fixed for
+      `RadialGauge`'s `trackColor` and `.neu-tile`/`.glass-panel` in §5.17, just missed
+      at this one call site) - fixed to `color-mix(in oklch, var(--destructive)/var(--success), white/black 12%)`
+      so the gauge keeps its two-tone gradient look while staying theme-aware. Also
+      fixed: `capIncentive` gated `discount_20` behind the loyalty bar but not
+      `fee_waiver` (arguably at least as costly) - extended the check to cover both;
+      `RecoveryStateProvider`'s context `value` wasn't memoized, so `AppNav` (now mounted
+      on every route, unlike before the routing migration) re-rendered on every unrelated
+      state change - wrapped the handlers in `useCallback` and the value in `useMemo`;
+      the palette system's localStorage key/default were hardcoded as separate string
+      literals in both `app/layout.tsx`'s blocking script and `lib/palette.tsx` - now a
+      single exported source of truth (`PALETTE_STORAGE_KEY`/`DEFAULT_PALETTE`)
+      interpolated into the script instead of duplicated; a stale "20% split" comment
+      survived the train/val/test rewrite into the generated model file's header -
+      made the comment compute its numbers from the actual constants instead of a fixed
+      string, and updated §7's stale metrics to match. One finding investigated and
+      closed as a non-issue rather than "fixed": `RadialGauge`'s `gradientFrom`/`gradientTo`
+      resolving `var()` through an SVG `stop-color` presentation-attribute prop rather
+      than inline `style` - flagged as a portability edge case, but already empirically
+      verified rendering correctly across all 3 palettes × both themes in this session's
+      own browser checks; hardened anyway (near-zero cost) by switching to `style={{ stopColor }}`,
+      matching how `trackColor` was already applied two lines below.
+    - **3-palette picker**: `src/lib/palette.tsx` (`PaletteProvider`/`usePalette()`, a
+      second theme axis independent of next-themes' light/dark, since next-themes only
+      manages one axis) + `src/components/shell/palette-picker.tsx` (a `Select` in
+      `AppNav`, reusing the existing shadcn `Select` component rather than building a new
+      dropdown). Three palettes - Amber & Teal (the existing default, needs no CSS
+      override), Emerald & Lime, Coral & Slate - reusing the exact three options
+      presented and partly chosen earlier this session (see §5.17's palette-direction
+      question), added here as user-facing choices instead of a single fixed pick.
+      `globals.css` gained `[data-palette="emerald"]`/`[data-palette="coral"]` blocks
+      that override only the brand pair (primary/accent + their dependents: ring,
+      chart-1, chart-3, sidebar-primary) - background/border/muted stay shared, and
+      success/destructive/escalated/chart-2/chart-4/chart-5 stay fixed semantic colors
+      regardless of palette, matching the design intent from §5.17's amber/teal rollout.
+      Every existing decorative utility (`.bg-mesh`, `.text-gradient-brand`, `.glow-ring`,
+      `.neu-tile`) already read `var(--primary)`/`var(--accent)`, so they repaint
+      automatically per palette with zero extra code - the var()-driven refactor in
+      §5.17 paid for itself here. A small blocking inline script in `app/layout.tsx`
+      (separate from next-themes' own, since next-themes doesn't manage this axis)
+      applies a stored palette choice before first paint, same reasoning as next-themes'
+      own script. Verified live in the browser: all 3 palettes × both themes, persistence
+      across a hard reload, no console errors, no flash of the wrong palette.
+
+20. **Final polish pass ("final touches, call it done"): mobile nav was actually broken,
+    README was stale.** Checking `AppNav` at a real 375px mobile viewport (never tested
+    at that width before, since all verification so far had been desktop-sized) found
+    that "Architecture" was present in the DOM but scrolled off-screen with zero visible
+    affordance that more nav items existed, and "Batch run" wrapped awkwardly - the nav
+    bar (logo + 4 links + palette picker + theme toggle) simply doesn't fit in 375px
+    logically, no CSS tweak was going to fix that. Rewrote `AppNav` with a real responsive
+    split: unchanged inline layout at `sm:` and up, collapsed to logo + theme toggle +
+    hamburger below it, opening a disclosure panel with the 4 links (block, closes the
+    menu on navigate) and the palette picker. Verified both breakpoints in the browser
+    (375px mobile, 1280px desktop) - desktop identical to before, mobile now fully
+    navigable with no clipped content. Also rewrote `README.md`, which had drifted
+    significantly behind reality: it still described the old single `app/page.tsx` shell
+    (deleted in §5.17), didn't mention the trained classifier/incentive guardrail/
+    bank-outage scheduling/UPI link/palette picker at all, and had no `npm run train:model`
+    or live deployment link. Brought it in line with what's actually shipped.
 
 ---
 
@@ -428,14 +513,17 @@ recoverability-model work in §7.
 
 ## 7. Trained recoverability model — shipped (see §5.18)
 
-Was deferred; built in §5.18. `scripts/train-recoverability-model.mjs` generates a
-synthetic labeled dataset, trains a hand-rolled logistic regression (batch gradient
-descent, L2-regularized, no external ML library), and writes weights + held-out
-precision/recall/accuracy/AUC into the generated `src/lib/recoverability-model.ts`.
-`src/lib/recoverability.ts` does zero-latency inference from those weights at runtime -
-no second service, keeping the single-deployable-app property from §3. Regenerate with
-`npm run train:model`. Current held-out metrics (400 test cases): precision 0.78,
-recall 0.78, accuracy 0.78, AUC 0.88 - also surfaced live in the Architecture tab.
+Was deferred; built in §5.18, hyperparameter-tuned in §5.19. `scripts/train-recoverability-model.mjs`
+generates a synthetic labeled dataset, splits it train/val/test, grid-searches learning
+rate and L2 strength on the validation split, refits on train+val with the winning
+hyperparameters, and writes weights + held-out precision/recall/accuracy/AUC (measured
+on the test split alone, never touched by training or hyperparameter selection) into the
+generated `src/lib/recoverability-model.ts`. `src/lib/recoverability.ts` does
+zero-latency inference from those weights at runtime - no second service, keeping the
+single-deployable-app property from §3. Regenerate with `npm run train:model`. Current
+held-out metrics (4000-row dataset, 600 test cases): precision 0.775, recall 0.825,
+accuracy 0.787, AUC 0.871 - also surfaced live in the Architecture tab, which now also
+notes the split methodology.
 
 ---
 

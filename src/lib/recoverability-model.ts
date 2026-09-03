@@ -3,42 +3,50 @@
 //
 // Trained on a synthetic labeled dataset (see the script for the labeling rule) since
 // this buildathon build has no live payments account / real recovery outcome history.
-// Precision/recall/AUC below are honest measurements against a held-out 20% split of
-// that synthetic data - they describe how well the model learned the documented rule,
-// not a claim about real-world recovery rates.
+// Precision/recall/AUC below are honest measurements against a held-out 15%
+// test split that never touches training or hyperparameter selection (a separate
+// 15% validation split, folded back into the final fit after being used only
+// to grid-search learning rate/L2 strength, handles that) - they describe how well the
+// model learned the documented rule, not a claim about real-world recovery rates.
 
 export const MODEL_WEIGHTS = {
   numericFeatures: ["attemptNumber","customerTenureMonths","previousSuccessfulPayments","amount"] as const,
   numericStats: {
   "attemptNumber": {
-    "mean": 1.97125,
-    "std": 0.8165007271889076
+    "mean": 1.9914285714285713,
+    "std": 0.8105981666368895
   },
   "customerTenureMonths": {
-    "mean": 18.12,
-    "std": 10.704933442109754
+    "mean": 18.21785714285714,
+    "std": 10.675189980625593
   },
   "previousSuccessfulPayments": {
-    "mean": 10.083125,
-    "std": 6.030958898415327
+    "mean": 10.033928571428572,
+    "std": 6.074765627040238
   },
   "amount": {
-    "mean": 4222.524375,
-    "std": 2173.234151134171
+    "mean": 4227.591428571429,
+    "std": 2179.029546494942
   }
 },
   failureReasonCategories: ["insufficient_funds","card_expired","bank_decline","issuer_unavailable","network_error","otp_timeout"] as const,
-  weights: [-1.0818918565123168,0.8995357353257123,0.7570734634910287,-0.27377748703802485,-0.08057485877480687,-0.09303822434715647,-0.29083154963545904,0.3163955015934966,0.3909235918871486,-0.22843728196860874],
-  bias: 0.04097757096337904,
+  weights: [-1.2940338043713846,1.004115658226697,0.873467926837223,-0.2301905382284642,-0.04032981199052424,-0.1459658114232231,-0.3678106849611345,0.42074767532352886,0.5715901001292344,-0.35155980640749646],
+  bias: 0.10468463385946494,
 };
 
 export const MODEL_METRICS = {
-  precision: 0.7794871794871795,
-  recall: 0.7755102040816326,
-  accuracy: 0.7825,
-  auc: 0.875375150060024,
-  datasetSize: 2000,
-  trainSize: 1600,
-  testSize: 400,
-  trainedAt: "2026-09-01T22:09:34.245Z",
+  precision: 0.7750759878419453,
+  recall: 0.8252427184466019,
+  accuracy: 0.7866666666666666,
+  auc: 0.8705946462927746,
+  datasetSize: 4000,
+  trainSize: 3400,
+  testSize: 600,
+  hyperparameters: {
+    learningRate: 0.2,
+    l2Lambda: 0.001,
+    epochs: 1000,
+    selectedByValidationAuc: 0.8679965713395154,
+  },
+  trainedAt: "2026-09-01T23:21:11.104Z",
 };
