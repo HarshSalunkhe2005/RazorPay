@@ -273,7 +273,7 @@ function AgentResultView({ result }: { result: AgentResult }) {
                   : "border-border/60 text-muted-foreground"
               )}
             >
-              {result.retryLinkIsLive ? "Live Razorpay test-mode link" : "Demo link (Razorpay keys not set)"}
+              {result.retryLinkIsLive ? "Live Razorpay test-mode link" : "Demo link (fallback — see audit trail)"}
             </Badge>
           )}
         </p>
