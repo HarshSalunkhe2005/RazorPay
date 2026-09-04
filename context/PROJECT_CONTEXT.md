@@ -581,6 +581,27 @@ Chronological, most useful for "why does the code look like this."
       renders, at a larger/bolder size on all breakpoints; only the small buildathon-tag
       subtitle line stays desktop-only.
 
+24. **Thorough live testing (explicitly requested) found a real hydration bug.** Ran
+    three scenarios directly against the live `/api/agent` after §5.23's key-verification
+    pass: a loyal proceed-case (correct - real Razorpay link, correct stage order, clean
+    audit trail), a brand-new/maxed-attempts write-off case (correct - score 4, no real
+    API call spent since it's not authorized to proceed, audit trail says so explicitly),
+    and the bank-outage case (correct once retried past one transient Razorpay-API
+    hiccup that the existing fallback handled exactly as designed - silently, honestly
+    logged, no crash). Then, checking the actual dialog UI rather than only the JSON
+    responses, found a genuine bug via the browser console: repeated React error #418
+    (hydration mismatch). Root cause: `lib/format.ts`'s `formatDate()` had no explicit
+    `timeZone`, so `Intl.DateTimeFormat` used the runtime's local zone - the server
+    (prerendering `/` at build time, UTC on Vercel) and the client (the viewer's browser
+    timezone) could format the same ISO timestamp into different text, mismatching on
+    every row of the payments table. Pre-existing, not introduced this session - just
+    never surfaced until console errors were actually checked during this pass. Fixed by
+    pinning to `Asia/Kolkata` (an Indian payments product should show IST regardless of
+    server/viewer timezone) across all three date-formatting call sites in the codebase
+    (`format.ts`, `audit-log-view.tsx`, `audit-trend-chart.tsx` - the latter two aren't
+    hydration-risk themselves, since audit-log data only loads client-side post-mount,
+    but had the same "different viewers see different wall-clock times" inconsistency).
+
 ---
 
 ## 6. Prior-art reviewed: `HarshSalunkhe2005/Retail-Agentic-AI`
