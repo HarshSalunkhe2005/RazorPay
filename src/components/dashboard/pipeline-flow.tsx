@@ -53,7 +53,7 @@ export function PipelineFlow() {
         />
         <Arrow label="within policy" />
         <FlowNode
-          title="Recovery Agent"
+          title="ReboundAI"
           sub="Gemini · classify → strategize → draft → act"
           variant="agent"
         />

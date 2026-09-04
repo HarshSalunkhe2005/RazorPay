@@ -1,14 +1,18 @@
-# Recovery Agent — Project Context
+# ReboundAI — Project Context
 
 Living document. Update this whenever a decision, failure, or scope change happens —
 this is the source of truth for "why is it built this way," not just "what it does."
+Renamed from "Recovery Agent" late in the build (see §5.22) - earlier entries in this
+log still say "Recovery Agent" throughout since that's what the product was called when
+those decisions were made; not rewritten retroactively.
 
 ---
 
 ## 1. What this is
 
-**Recovery Agent** — submission for the **Razorpay AI Buildathon**, Track 03
-(**AI Revenue Recovery**). Deadline: **5 September 2026**. Solo build.
+**ReboundAI** (originally built as "Recovery Agent" - see §5.22) — submission for the
+**Razorpay AI Buildathon**, Track 03 (**AI Revenue Recovery**). Deadline:
+**5 September 2026**. Solo build.
 
 An agent that looks at failed payments/subscription renewals individually, diagnoses the
 real reason they failed, and drives a personalized win-back flow (channel, timing,
@@ -519,6 +523,31 @@ Chronological, most useful for "why does the code look like this."
     Verified: build/lint clean, the no-keys fallback path exercised directly (this
     session has no Razorpay test keys available to it) - the live-key path is unverified
     pending the user adding `RAZORPAY_KEY_ID`/`RAZORPAY_KEY_SECRET` locally and on Vercel.
+
+22. **Renamed "Recovery Agent" → "ReboundAI."** Same complaint pattern as §5.17's
+    palette/theme redesign: a purely descriptive name doesn't stand out next to
+    competitor names like "RevShield AI" and "RecoverAI" (see §5.21). Chose "ReboundAI"
+    over other candidates offered (`Recoup`, `Winback` - already the term used
+    internally throughout this doc and the codebase, `Comeback`) - user's call, not
+    argued against despite `Recoup`/`Winback` being pitched as not needing an "AI" suffix
+    the way every competitor's name already has one; a fair point in the abstract, but
+    the user's name to pick. Updated everywhere the name is genuinely user-facing: page
+    `<title>`/metadata (`app/layout.tsx`), the nav wordmark (`components/shell/app-nav.tsx`),
+    404 copy, `README.md`'s title and intro line, the pipeline diagram's LLM-stage node
+    label (`pipeline-flow.tsx`), the LLM's own system-prompt self-identification and the
+    UPI deep link's payee name/VPA (`agent.ts`), and `package.json`'s `name` field.
+    Deliberately did NOT rename: the `runRecoveryAgent()` function and other internal
+    code symbols, `localStorage` keys (`recovery-agent-audit-log`,
+    `recovery-agent-palette`), or generic lowercase descriptive text ("the recovery
+    agent" as a role description, e.g. in `payments-table.tsx`'s column header or
+    `batch-run-panel.tsx`'s copy) - none of that is brand-facing, and touching it would
+    be pure churn with real regression risk (a `localStorage` key rename silently drops
+    every existing user's persisted audit log/palette choice) for zero user-visible
+    benefit. Did NOT rename the GitHub repo or the Vercel deployment URL
+    (`razor-pay-five-bice.vercel.app`) - that changes public, already-shared links and
+    needs an explicit decision, not a side effect of an in-app branding pass. This
+    document's own historical entries (everything above this one) still say "Recovery
+    Agent" throughout and are deliberately left that way - see the note at the top of §1.
 
 ---
 

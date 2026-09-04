@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Recovery Agent | AI Revenue Recovery",
+  title: "ReboundAI | AI Revenue Recovery",
   description:
     "An autonomous agent that diagnoses failed payments and drives personalized win-back flows.",
 };

@@ -61,7 +61,7 @@ export function AppNav() {
           </div>
           <div className="hidden min-w-0 sm:block">
             <p className="truncate text-sm font-semibold tracking-tight text-foreground">
-              Recovery <span className="text-gradient-brand">Agent</span>
+              Rebound<span className="text-gradient-brand">AI</span>
             </p>
             <p className="flex items-center gap-1.5 truncate text-[11px] text-muted-foreground">
               <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-success" />

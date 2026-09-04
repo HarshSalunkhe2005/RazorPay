@@ -7,7 +7,7 @@ export default function NotFound() {
         <p className="font-figures text-sm text-muted-foreground">404</p>
         <h1 className="mt-2 text-xl font-semibold text-foreground">Page not found</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          This route doesn&rsquo;t exist. The Recovery Agent dashboard lives at the root.
+          This route doesn&rsquo;t exist. The ReboundAI dashboard lives at the root.
         </p>
         <Link
           href="/"

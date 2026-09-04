@@ -85,7 +85,7 @@ const RESPONSE_JSON_SCHEMA = {
   ],
 };
 
-const SYSTEM_PROMPT = `You are the Recovery Agent for a payments platform, modeled on Razorpay's AI Buildathon "Revenue Recovery" track.
+const SYSTEM_PROMPT = `You are ReboundAI, the recovery agent for a payments platform, modeled on Razorpay's AI Buildathon "Revenue Recovery" track.
 
 Given one failed payment/subscription-renewal event, work through four explicit reasoning stages and return them all:
 1. "classify" - diagnose the true root cause behind the failure code (not just restate it). A trained classifier's recoverability estimate for this case is given to you as reference context below (not something you output) - use it as a starting point, and say in your reasoning whether the qualitative picture (failure type, tenure, payment history) agrees with it or would push the number higher/lower.
@@ -234,7 +234,7 @@ export async function runRecoveryAgent(payment: FailedPayment): Promise<AgentOut
     message: parsed.message,
     retryLink: liveLink?.shortUrl ?? `https://rzp.io/retry/${payment.subscriptionId.toLowerCase()}`,
     retryLinkIsLive: liveLink !== null,
-    upiIntentLink: `upi://pay?pa=recoveryagent@razorpay&pn=RecoveryAgent&am=${payment.amount}&cu=INR&tn=${encodeURIComponent(
+    upiIntentLink: `upi://pay?pa=reboundai@razorpay&pn=ReboundAI&am=${payment.amount}&cu=INR&tn=${encodeURIComponent(
       `Retry ${payment.planName}`
     )}`,
     retryScheduledFor,

@@ -1,10 +1,10 @@
-# Recovery Agent
+# ReboundAI
 
 An AI agent that turns failed payments into recovered revenue — built for the **Razorpay AI Buildathon**, Revenue Recovery track.
 
 Live: [razor-pay-five-bice.vercel.app](https://razor-pay-five-bice.vercel.app)
 
-Instead of firing the same generic "your payment failed, please retry" email at every customer, Recovery Agent looks at each failed payment individually and reasons through four explicit stages before acting:
+Instead of firing the same generic "your payment failed, please retry" email at every customer, ReboundAI looks at each failed payment individually and reasons through four explicit stages before acting:
 
 1. **Classify** — diagnoses the real root cause behind the failure (not just the raw decline code). Recoverability is scored by a **trained logistic-regression classifier** (`scripts/train-recoverability-model.mjs`), not an LLM guess — the model gets the score as reference context, not something it invents.
 2. **Strategize** — picks the best recovery channel (email / SMS / WhatsApp / voice), timing, and incentive, weighing it against the customer's tenure and payment history. A deterministic **incentive guardrail** (`lib/incentive-guard.ts`) caps discounts/waivers for unproven customers regardless of what the model recommends, and a **bank-outage check** (`lib/bank-uptime.ts`) defers contact instead of retrying into a known-down gateway.
