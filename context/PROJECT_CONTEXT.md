@@ -549,6 +549,38 @@ Chronological, most useful for "why does the code look like this."
     document's own historical entries (everything above this one) still say "Recovery
     Agent" throughout and are deliberately left that way - see the note at the top of §1.
 
+23. **Razorpay keys went live, then a final copy/branding polish pass.** User added
+    `RAZORPAY_KEY_ID`/`RAZORPAY_KEY_SECRET` to Vercel. Verified for real, not assumed:
+    hit the live `/api/agent` directly and got back `retryLinkIsLive: true`, a genuine
+    `https://rzp.io/rzp/...` short URL, and a real Razorpay payment-link id in the audit
+    trail - the fallback-only state from §5.21 is now confirmed working end to end on
+    the actual live-key path, not just the demo-link path.
+    - **Copy pass, asked for directly**: user flagged that short, punchy, "not X, but Y"
+      fragment sentences read as AI-generated. Real pattern, not a false complaint - a
+      grep across `src/` for `", not a"`/`", not an"`/`"not just"` turned up the same
+      contrastive-title construction repeated across `architecture-view.tsx`'s three
+      card headers ("Why a governed pipeline, not a single prompt," "A trained
+      recoverability model, not an LLM guess") plus terse two-fragment taglines
+      elsewhere ("Same governed pipeline, your data.", `SectionHeader` descriptions on
+      the batch/audit/architecture routes). Rewrote all of it into complete, varied
+      sentences that say the same thing without the repeated formula. Left the
+      equivalent phrasing inside code *comments* alone (`bank-uptime.ts`, `simulate.ts`,
+      etc.) - those aren't user-facing, rewriting them would be pure churn.
+    - **Logo added**: `src/components/shell/logomark.tsx` - a small custom SVG (a line
+      that dips, representing the failed payment, then rebounds sharply upward into an
+      arrowhead) replacing the plain "RA" text-initials badge that had been there since
+      the very first version of the nav. Deliberately not a generic trend-up icon
+      reused off the shelf - the dip-then-recover shape is specific to what the product
+      does.
+    - **Name visibility bug, found while doing this**: the "ReboundAI" wordmark next to
+      the logo was wrapped in `hidden ... sm:block` - it never rendered at all below the
+      640px breakpoint. Combined with §5.20's mobile-nav rebuild (logo + hamburger only
+      on mobile), this meant the product's actual name was invisible on every phone-width
+      view of the app, an accidental regression neither prior session caught since
+      neither was specifically checking name visibility. Fixed: the wordmark now always
+      renders, at a larger/bolder size on all breakpoints; only the small buildathon-tag
+      subtitle line stays desktop-only.
+
 ---
 
 ## 6. Prior-art reviewed: `HarshSalunkhe2005/Retail-Agentic-AI`

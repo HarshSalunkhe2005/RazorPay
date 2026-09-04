@@ -10,7 +10,7 @@ export default function ArchitecturePage() {
       <SectionHeader
         icon={Workflow}
         title="Architecture"
-        description="Why this is a governed pipeline instead of a single prompt, and what's still ahead."
+        description="How the pipeline is governed, why it isn't just one prompt, and what's still left to build."
         accent="neutral"
       />
       <ArchitectureView />

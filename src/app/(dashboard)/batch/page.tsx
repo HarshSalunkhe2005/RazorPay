@@ -13,7 +13,7 @@ export default function BatchPage() {
       <SectionHeader
         icon={Zap}
         title="Batch run"
-        description="Every open case, through the same pipeline, at once."
+        description="Runs every open case through the same pipeline at once, instead of working through them one at a time."
         accent="accent"
       />
       <BatchRunPanel

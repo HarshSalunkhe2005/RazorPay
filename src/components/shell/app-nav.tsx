@@ -9,6 +9,7 @@ import { useRecoveryState } from "@/lib/recovery-state";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "./theme-toggle";
 import { PalettePicker } from "./palette-picker";
+import { Logomark } from "./logomark";
 
 const NAV_ITEMS = [
   { href: "/", label: "Queue" },
@@ -55,15 +56,15 @@ export function AppNav() {
   return (
     <nav className="sticky top-0 z-40 border-b border-border/60 bg-background/80 backdrop-blur-md">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
-        <div className="flex min-w-0 items-center gap-3">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-accent font-figures text-xs font-bold text-primary-foreground shadow-sm">
-            RA
+        <div className="flex min-w-0 items-center gap-2.5">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-accent text-primary-foreground shadow-sm">
+            <Logomark className="size-5" />
           </div>
-          <div className="hidden min-w-0 sm:block">
-            <p className="truncate text-sm font-semibold tracking-tight text-foreground">
+          <div className="min-w-0">
+            <p className="truncate text-base font-bold tracking-tight text-foreground">
               Rebound<span className="text-gradient-brand">AI</span>
             </p>
-            <p className="flex items-center gap-1.5 truncate text-[11px] text-muted-foreground">
+            <p className="hidden items-center gap-1.5 truncate text-[11px] text-muted-foreground sm:flex">
               <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-success" />
               Razorpay AI Buildathon · Revenue Recovery
             </p>

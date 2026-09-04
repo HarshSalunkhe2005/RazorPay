@@ -4,14 +4,14 @@ An AI agent that turns failed payments into recovered revenue — built for the 
 
 Live: [razor-pay-five-bice.vercel.app](https://razor-pay-five-bice.vercel.app)
 
-Instead of firing the same generic "your payment failed, please retry" email at every customer, ReboundAI looks at each failed payment individually and reasons through four explicit stages before acting:
+Most failed-payment flows send the same generic "your payment failed, please retry" email to every customer. ReboundAI looks at each failed payment individually and works through four explicit stages before deciding what to do:
 
-1. **Classify** — diagnoses the real root cause behind the failure (not just the raw decline code). Recoverability is scored by a **trained logistic-regression classifier** (`scripts/train-recoverability-model.mjs`), not an LLM guess — the model gets the score as reference context, not something it invents.
-2. **Strategize** — picks the best recovery channel (email / SMS / WhatsApp / voice), timing, and incentive, weighing it against the customer's tenure and payment history. A deterministic **incentive guardrail** (`lib/incentive-guard.ts`) caps discounts/waivers for unproven customers regardless of what the model recommends, and a **bank-outage check** (`lib/bank-uptime.ts`) defers contact instead of retrying into a known-down gateway.
-3. **Draft** — writes the actual outbound message, in the customer's preferred language and channel-appropriate tone (short/punchy for SMS/WhatsApp, a spoken script for voice, natural Hinglish where relevant — not literal translation).
-4. **Act** — generates a fresh retry payment link (a genuine Razorpay Payment Links API test-mode response, not a constructed URL) plus a 1-tap UPI deep link, and summarizes the automated next step.
+1. **Classify** — figures out the real root cause behind the failure, beyond the raw decline code. Recoverability is scored by a **trained logistic-regression classifier** (`scripts/train-recoverability-model.mjs`) rather than an LLM guess; the model gets that score as context to reason from, but doesn't invent the number itself.
+2. **Strategize** — picks the best recovery channel (email / SMS / WhatsApp / voice), timing, and incentive, weighing it against the customer's tenure and payment history. A deterministic **incentive guardrail** (`lib/incentive-guard.ts`) caps discounts and waivers for unproven customers no matter what the model recommends, and a **bank-outage check** (`lib/bank-uptime.ts`) defers contact instead of retrying into a gateway that's known to be down.
+3. **Draft** — writes the actual outbound message in the customer's preferred language, matching tone to channel: short and punchy for SMS/WhatsApp, a spoken script for voice calls, natural Hinglish where it fits rather than a literal translation.
+4. **Act** — generates a fresh retry payment link (a real Razorpay Payment Links API test-mode response, not a constructed URL) plus a 1-tap UPI deep link, and logs the automated next step.
 
-The dashboard shows this reasoning live (staggered reveal, not a single opaque LLM call) so it's visibly an agent working the case, not a black box. A persistent nav bar (`/`, `/batch`, `/audit`, `/architecture`) replaces a single scrolling page, with a light/dark toggle and a choice of three color palettes.
+The dashboard shows this reasoning live, with each stage revealed as it completes, so you can watch the agent actually work a case instead of just seeing a final answer appear. A persistent nav bar (`/`, `/batch`, `/audit`, `/architecture`) replaces a single scrolling page, with a light/dark toggle and a choice of three color palettes.
 
 ## Stack
 
@@ -54,7 +54,7 @@ src/
     api/agent/batch/route.ts     API route that runs the agent across all open cases
   components/
     dashboard/                  Stat cards, payments table, agent trace dialog, batch run panel, architecture view
-    shell/                      AppNav, ThemeToggle, PalettePicker
+    shell/                      AppNav, ThemeToggle, PalettePicker, Logomark
   lib/
     types.ts                    Shared domain types
     mock-data.ts                 Seeded failed-payment dataset

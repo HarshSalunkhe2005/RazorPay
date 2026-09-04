@@ -13,7 +13,7 @@ export default function AuditPage() {
       <SectionHeader
         icon={ScrollText}
         title="Audit log"
-        description="Every governed decision, single-case or batch, persisted across reloads — the record of truth, not the dialog you happened to leave open."
+        description="Every governed decision gets logged here, whether it came from a single case or a batch run, and it survives a page reload. This is the actual record, not whatever dialog you happened to leave open."
         accent="success"
       />
       <AuditLogView records={auditLog} onClear={handleClearAuditLog} />

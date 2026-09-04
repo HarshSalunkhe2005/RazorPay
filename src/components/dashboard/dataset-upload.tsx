@@ -102,7 +102,7 @@ export function DatasetUpload({ onReplace, onReset, isSample, currentLabel }: Da
             {busy ? "Reading file…" : "Drop a CSV or JSON file to run your own cases"}
           </p>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            Same governed pipeline, your data. Currently: {currentLabel}
+            Runs through the same governed pipeline as the sample data. Currently loaded: {currentLabel}
           </p>
         </div>
 
