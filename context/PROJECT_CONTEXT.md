@@ -601,6 +601,14 @@ Chronological, most useful for "why does the code look like this."
     (`format.ts`, `audit-log-view.tsx`, `audit-trend-chart.tsx` - the latter two aren't
     hydration-risk themselves, since audit-log data only loads client-side post-mount,
     but had the same "different viewers see different wall-clock times" inconsistency).
+    Re-testing after the fix, past the same three scenarios, surfaced one more real,
+    smaller issue: `agent-trace-dialog.tsx`'s badge said "Demo link (Razorpay keys not
+    set)" unconditionally whenever `retryLinkIsLive` was false, but one of the retries
+    hit exactly the case where keys *are* configured and the fallback fired from a
+    transient Razorpay API failure instead - so the badge was asserting a specific,
+    sometimes-wrong cause. `agent.ts`'s own audit-trail entry already hedges correctly
+    ("not configured (or the API call failed)"); made the badge say the same
+    thing instead of a more confident but occasionally false claim.
 
 ---
 
