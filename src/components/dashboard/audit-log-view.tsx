@@ -63,6 +63,7 @@ function RecordRow({ record }: { record: AuditLogRecord }) {
           {new Date(record.recordedAt).toLocaleTimeString("en-IN", {
             hour: "2-digit",
             minute: "2-digit",
+            timeZone: "Asia/Kolkata",
           })}
         </span>
         <span className="shrink-0 text-muted-foreground/50">{expanded ? "−" : "+"}</span>

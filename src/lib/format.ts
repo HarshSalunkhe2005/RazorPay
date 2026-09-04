@@ -12,6 +12,12 @@ export function formatDate(iso: string): string {
     month: "short",
     hour: "2-digit",
     minute: "2-digit",
+    // Explicit, not the runtime's local zone - without this, the server (prerendering
+    // "/" at build time, UTC on Vercel) and the client (whatever timezone the browser is
+    // in) can format the same ISO timestamp into different text, which is a hydration
+    // mismatch (React error #418) on every row of the payments table. IST since this is
+    // an Indian payments product - real Razorpay merchants read failure times in IST.
+    timeZone: "Asia/Kolkata",
   }).format(new Date(iso));
 }
 

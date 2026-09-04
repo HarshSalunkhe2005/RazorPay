@@ -25,7 +25,7 @@ function buildSeries(records: AuditLogRecord[]) {
   return Array.from(byDay.entries())
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([day, counts]) => ({
-      day: new Date(day).toLocaleDateString("en-IN", { day: "numeric", month: "short" }),
+      day: new Date(day).toLocaleDateString("en-IN", { day: "numeric", month: "short", timeZone: "Asia/Kolkata" }),
       ...counts,
     }));
 }
